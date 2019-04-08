@@ -18,6 +18,16 @@ impl Scalar {
         Scalar { num: num.into(), modulo: modulo.into() }
     }
 
+    pub fn infinity<I: Into<Integer>>(modulo: I) -> Scalar {
+        Self { num: 0.into(), modulo: modulo.into() } // Right now I'm representing Infinity as (0,0).
+    }
+    pub fn is_infinity(&self) -> bool {
+        self.num == Self::infinity(&self.modulo)
+    }
+    pub fn is_zero(&self) -> bool {
+        self.num == 0
+    }
+
     pub fn pow_u<I: Into<Integer>>(self, other: I) -> Scalar {
         let num = (self.num.pow_mod(&other.into(), &self.modulo)).unwrap();
         Scalar { num, modulo: self.modulo }

@@ -45,6 +45,7 @@ impl Point {
         let x = Scalar::new(x, modulo);
         let y = Scalar::new(y, x.modulo.clone());
         let point = Self { x, y, group };
+        return Ok(point);
         if !point.is_on_curve() {
             Err(())
         } else {
@@ -72,9 +73,21 @@ impl Add for Point {
     type Output = Self;
     #[inline(always)]
     fn add(self, other: Self) -> Self {
-        let m = self.get_slope(&other);
-        let x = m.clone().pow_u(2) - self.x.clone() - other.x;
-        let y = m*(self.x-x.clone())-self.y; // negative of y-y1=m(x-x1)
-        Self {x,y, group: self.group}
+        let inf = Scalar::infinity(&self.x.modulo);
+        if self.x.is_infinity() {
+            other
+        } else if other.x.is_infinity() {
+            self
+        } else if self.x == other.x && self.y != other.y {
+            let inf = Scalar::infinity(&self.x.modulo);
+            Self { x: inf.clone(), y: inf.clone(), group: self.group }
+        } else if self == other && self.y.is_zero() {
+            Self { x: inf.clone(), y: inf.clone(), group: self.group }
+        } else {
+            let m = self.get_slope(&other);
+            let x = m.clone().pow_u(2) - self.x.clone() - other.x;
+            let y = m*(self.x-x.clone())-self.y; // negative of y-y1=m(x-x1)
+            Self {x,y, group: self.group}
+        }
     }
 }
