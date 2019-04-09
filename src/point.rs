@@ -12,13 +12,19 @@ impl Group {
     pub fn new<I: Into<Integer>, T: Into<Integer>>(a: I, b: T) -> Self {
         Self{ a: a.into(), b: b.into() }
     }
+
+    pub fn get_y(&self, x: &FieldElement) -> FieldElement {
+        let mut y2 = x.clone().pow_u(3) + (self.a.clone() * x) + &self.b; // Y^2 = X^3 + ax + b
+        y2.sqrt();
+        y2
+    }
 }
 
 #[derive(PartialEq, Clone)]
 pub struct Point {
     pub x: FieldElement,
     pub y: FieldElement,
-    group: Group,
+    pub group: Group,
 }
 
 impl fmt::Display for Point {
@@ -59,7 +65,7 @@ impl Point {
     }
 
     #[inline(always)]
-    fn is_on_curve(&self) -> bool {
+    pub fn is_on_curve(&self) -> bool {
         self.y.clone().pow_u(2) == (self.x.clone().pow_u(3) + self.group.a.clone() * self.x.clone() + &self.group.b) // Y^2 = X^3 + ax + b
     }
 
@@ -100,6 +106,8 @@ macro_rules! mul_impl_point {
     ($($t:ty)*) => ($(
        impl Mul<$t> for Point {
         type Output = Point;
+            #[allow(clippy::suspicious_arithmetic_impl)]
+            #[inline(always)]
             fn mul(self, mut other: $t) -> Self {
                 let mut result = self.gen_zero();
                 let mut adding = self.clone();
@@ -115,6 +123,8 @@ macro_rules! mul_impl_point {
         }
         impl Mul<&$t> for Point {
         type Output = Point;
+             #[allow(clippy::suspicious_arithmetic_impl)]
+            #[inline(always)]
             fn mul(self, other: &$t) -> Self {
                 let mut other = other.clone();
                 let mut result = self.gen_zero();
@@ -131,7 +141,9 @@ macro_rules! mul_impl_point {
         }
         impl Mul<Point> for $t {
         type Output = Point;
-            fn mul(mut self, mut other: Point) -> Point {
+            #[allow(clippy::suspicious_arithmetic_impl)]
+            #[inline(always)]
+            fn mul(mut self, other: Point) -> Point {
                 let mut result = other.gen_zero();
                 let mut adding = other.clone();
                 while self != 0 {
@@ -146,7 +158,9 @@ macro_rules! mul_impl_point {
         }
         impl Mul<Point> for &$t {
         type Output = Point;
-            fn mul(self, mut other: Point) -> Point {
+            #[allow(clippy::suspicious_arithmetic_impl)]
+            #[inline(always)]
+            fn mul(self, other: Point) -> Point {
                 let mut s = self.clone();
                 let mut result = other.gen_zero();
                 let mut adding = other.clone();

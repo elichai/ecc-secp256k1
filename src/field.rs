@@ -1,9 +1,9 @@
 use std::{ops::*, fmt};
-use rug::Integer;
+use rug::{Integer, integer::Order, ops::NegAssign};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FieldElement {
-    num: Integer,
+    pub num: Integer,
     pub modulo: Integer,
 }
 
@@ -14,6 +14,7 @@ impl fmt::Display for FieldElement {
 }
 
 impl FieldElement {
+    const ORDER: Order = Order::MsfLe;
     pub fn new<I: Into<Integer>, T: Into<Integer>>(num: I, modulo: T) -> FieldElement {
         FieldElement { num: num.into(), modulo: modulo.into() }
     }
@@ -41,6 +42,13 @@ impl FieldElement {
     }
 
     #[inline(always)]
+    pub fn sqrt(&mut self) {
+        let mut p: Integer = self.modulo.clone() + 1;
+        p.div_exact_mut(&4.into());
+        self.num.pow_mod_mut(&p, &self.modulo).unwrap();
+    }
+
+    #[inline(always)]
     fn same_modulo(&self, other: &Self) {
         if self.modulo != other.modulo {
             unimplemented!();
@@ -56,10 +64,30 @@ impl FieldElement {
     pub fn inner(&self) -> &Integer {
         &self.num
     }
+
+    #[inline(always)]
+    pub fn reflect(&mut self) {
+        self.num.neg_assign();
+        self.round_mod();
+        self.num = self.num.clone() & &self.modulo;
+    }
+
+    pub fn serialize_num(self) -> Vec<u8> {
+        self.num.to_digits(Self::ORDER)
+    }
+
+    pub fn from_serialize<I: Into<Integer>>(ser: &[u8], modulo: I) -> FieldElement {
+        let num = Integer::from_digits(ser, Self::ORDER);
+        FieldElement { num, modulo: modulo.into() }
+    }
+
+    pub fn is_even(&self) -> bool {
+        self.num.is_even()
+    }
 }
 
 #[inline(always)]
-fn mod_and_new(num: Integer, modulo: &Integer) -> FieldElement {
+pub fn mod_and_new(num: Integer, modulo: &Integer) -> FieldElement {
     let num = num % modulo;
     let mut res = FieldElement { num, modulo: modulo.clone() };
     res.round_mod();
