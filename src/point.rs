@@ -83,10 +83,31 @@ impl Add for Point {
         } else if self == other && self.y.is_zero() {
             Self { x: inf.clone(), y: inf.clone(), group: self.group }
         } else {
-            let m = self.get_slope(&other);
-            let x = m.clone().pow_u(2) - self.x.clone() - other.x;
-            let y = m*(self.x-x.clone())-self.y; // negative of y-y1=m(x-x1)
+            let m = self.get_slope(&other); // Returns the slope of the line
+            let x = m.clone().pow_u(2) - &self.x - other.x; // takes the slope to the power of 2 minus both X's
+            let y = m * (self.x - &x) - self.y; // negative of y-y1=m(x-x1) - Simple line equation
             Self {x,y, group: self.group}
         }
     }
 }
+macro_rules! mul_impl_point {
+    ($($t:ty)*) => ($(
+       impl Mul<$t> for Point {
+        type Output = Point;
+            fn mul(self, mut other: $t) -> Self {
+                let mut result = self.clone();
+                let mut adding = self.clone();
+                while other != 0 {
+                    if (other.clone() & 1) == 1 {
+                        result = result.clone() + adding.clone();
+                    }
+                    adding = adding.clone() + adding;
+                    other >>= 1;
+                }
+                result
+            }
+        }
+        )*)
+}
+
+mul_impl_point! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 Integer }
