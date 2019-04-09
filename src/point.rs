@@ -16,8 +16,8 @@ impl Group {
 
 #[derive(PartialEq, Clone)]
 pub struct Point {
-    x: FieldElement,
-    y: FieldElement,
+    pub x: FieldElement,
+    pub y: FieldElement,
     group: Group,
 }
 
@@ -50,6 +50,12 @@ impl Point {
         } else {
             Ok(point)
         }
+    }
+
+    pub fn gen_zero(&self) -> Self {
+        let x = FieldElement::new(0, &self.x.modulo);
+        let y = FieldElement::new(0, &self.x.modulo);
+        Self { x, y, group: self.group.clone() }
     }
 
     #[inline(always)]
@@ -95,7 +101,7 @@ macro_rules! mul_impl_point {
        impl Mul<$t> for Point {
         type Output = Point;
             fn mul(self, mut other: $t) -> Self {
-                let mut result = self.clone();
+                let mut result = self.gen_zero();
                 let mut adding = self.clone();
                 while other != 0 {
                     if (other.clone() & 1) == 1 {
@@ -103,6 +109,53 @@ macro_rules! mul_impl_point {
                     }
                     adding = adding.clone() + adding;
                     other >>= 1;
+                }
+                result
+            }
+        }
+        impl Mul<&$t> for Point {
+        type Output = Point;
+            fn mul(self, other: &$t) -> Self {
+                let mut other = other.clone();
+                let mut result = self.gen_zero();
+                let mut adding = self.clone();
+                while other != 0 {
+                    if (other.clone() & 1) == 1 {
+                        result = result.clone() + adding.clone();
+                    }
+                    adding = adding.clone() + adding;
+                    other >>= 1;
+                }
+                result
+            }
+        }
+        impl Mul<Point> for $t {
+        type Output = Point;
+            fn mul(mut self, mut other: Point) -> Point {
+                let mut result = other.gen_zero();
+                let mut adding = other.clone();
+                while self != 0 {
+                    if (self.clone() & 1) == 1 {
+                        result = result.clone() + adding.clone();
+                    }
+                    adding = adding.clone() + adding;
+                    self >>= 1;
+                }
+                result
+            }
+        }
+        impl Mul<Point> for &$t {
+        type Output = Point;
+            fn mul(self, mut other: Point) -> Point {
+                let mut s = self.clone();
+                let mut result = other.gen_zero();
+                let mut adding = other.clone();
+                while s != 0 {
+                    if (s.clone() & 1) == 1 {
+                        result = result.clone() + adding.clone();
+                    }
+                    adding = adding.clone() + adding;
+                    s >>= 1;
                 }
                 result
             }

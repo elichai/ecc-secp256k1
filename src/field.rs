@@ -52,6 +52,10 @@ impl FieldElement {
             self.num += &self.modulo;
         }
     }
+    #[inline(always)]
+    pub fn inner(&self) -> &Integer {
+        &self.num
+    }
 }
 
 #[inline(always)]
