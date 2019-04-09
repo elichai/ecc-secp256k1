@@ -1,6 +1,6 @@
 use std::{ops::*, fmt};
 use rug::Integer;
-use crate::scalar::*;
+use crate::field::*;
 
 #[derive(Clone, PartialEq)]
 pub struct Group {
@@ -16,8 +16,8 @@ impl Group {
 
 #[derive(PartialEq, Clone)]
 pub struct Point {
-    x: Scalar,
-    y: Scalar,
+    x: FieldElement,
+    y: FieldElement,
     group: Group,
 }
 
@@ -42,10 +42,9 @@ impl Point {
 
     pub fn new_with_group<I,T,V>(x: I, y: T, modulo: V, group: Group) -> Result<Self, ()>
         where I: Into<Integer>, T: Into<Integer>, V: Into<Integer> {
-        let x = Scalar::new(x, modulo);
-        let y = Scalar::new(y, x.modulo.clone());
+        let x = FieldElement::new(x, modulo);
+        let y = FieldElement::new(y, x.modulo.clone());
         let point = Self { x, y, group };
-        return Ok(point);
         if !point.is_on_curve() {
             Err(())
         } else {
@@ -59,7 +58,7 @@ impl Point {
     }
 
     #[inline(always)]
-    fn get_slope(&self, other: &Point) -> Scalar {
+    fn get_slope(&self, other: &Point) -> FieldElement {
         if self.x != other.x {
             (self.y.clone() - other.y.clone()) / (self.x.clone() - other.x.clone())
         } else {
@@ -73,13 +72,13 @@ impl Add for Point {
     type Output = Self;
     #[inline(always)]
     fn add(self, other: Self) -> Self {
-        let inf = Scalar::infinity(&self.x.modulo);
+        let inf = FieldElement::infinity(&self.x.modulo);
         if self.x.is_infinity() {
             other
         } else if other.x.is_infinity() {
             self
         } else if self.x == other.x && self.y != other.y {
-            let inf = Scalar::infinity(&self.x.modulo);
+            let inf = FieldElement::infinity(&self.x.modulo);
             Self { x: inf.clone(), y: inf.clone(), group: self.group }
         } else if self == other && self.y.is_zero() {
             Self { x: inf.clone(), y: inf.clone(), group: self.group }

@@ -1,4 +1,4 @@
-mod scalar;
+mod field;
 mod point;
 
 use self::point::*;
