@@ -55,11 +55,17 @@ impl FieldElement {
         }
     }
     #[inline(always)]
-    fn round_mod(&mut self) {
+    pub fn round_mod(&mut self) {
         if self.num < 0 {
             self.num += &self.modulo;
         }
     }
+
+    pub fn mod_num(&mut self) -> &mut Self {
+        self.num =  self.num.clone() % &self.modulo;
+        self
+    }
+
     #[inline(always)]
     pub fn inner(&self) -> &Integer {
         &self.num
@@ -280,6 +286,13 @@ macro_rules! sub_impl_field {
        type Output = FieldElement;
             fn sub(self, other: FieldElement) -> FieldElement {
                 let s = FieldElement::new(self, &other.modulo);
+                s - other
+            }
+        }
+       impl Sub<FieldElement> for &$t {
+       type Output = FieldElement;
+            fn sub(self, other: FieldElement) -> FieldElement {
+                let s = FieldElement::new(self.clone(), &other.modulo);
                 s - other
             }
         }

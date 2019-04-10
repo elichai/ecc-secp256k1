@@ -1,12 +1,14 @@
 
 use rug::Integer;
-use crate::{Point, Group, FieldElement};
+use crate::{Point, Group, FieldElement, hash::{HashDigest, HashTrait}};
 use std::fmt;
-use sha2::{Sha256, Digest};
+use rand::rngs::OsRng;
+use rand::Rng;
 
 #[derive(Clone, PartialEq, Debug)]
 struct Secp256k1 {
     pub modulo: Integer,
+    pub order: Integer,
     generator: Point
 }
 
@@ -25,11 +27,12 @@ impl Secp256k1 {
         let x: Integer = Self::Gx.parse().unwrap();
         let y: Integer = Self::Gy.parse().unwrap();
         let p: Integer = Self::p.parse().unwrap();
+        let n: Integer = Self::n.parse().unwrap();
         let a = Integer::from(Self::a);
         let b = Integer::from(Self::b);
         let group = Group { a, b };
         let point = Point::new_with_group(x, y, &p, group).unwrap();
-        Secp256k1 { generator: point, modulo: p }
+        Secp256k1 { generator: point, modulo: p, order: n }
     }
 
     pub fn generator(&self) -> Point {
@@ -85,7 +88,6 @@ impl PublicKey {
         let mut y = secp.generator.group.get_y(&x);
         let is_even = y.is_even();
         if (ser[0] == 0x02 && !is_even) || (ser[0] == 0x03 && is_even) {
-            println!("fdsfdsf");
             y = secp.modulo.clone() - y;
         } else if ser[0] != 0x02 && ser[0] != 0x03 {
             unimplemented!()
@@ -93,7 +95,20 @@ impl PublicKey {
         let point = Point { x,y, group: secp.generator.group.clone() };
         dbg!(point.is_on_curve());
         PublicKey { point, _secp: secp }
+    }
 
+    pub fn verify(&self, msg: &[u8], sig: [u8; 64]) -> bool {
+        let order = &self._secp.order;
+        let G = self._secp.generator();
+        let z = FieldElement::from_serialize(&msg.hash_digest(), order);
+        let r = FieldElement::from_serialize(&sig[..32], order);
+        let s = FieldElement::from_serialize(&sig[32..], order);
+        let u1 = z / &s;
+        let u2 = r.clone() / &s;
+        let point: Point = (u1.num * G) + (u2.num * self.point.clone());
+        dbg!(&point);
+        dbg!(&r);
+        dbg!(point.x.num == r.num)
     }
 }
 
@@ -116,11 +131,35 @@ impl PrivateKey {
         } else {
             0x03
         };
-        let mut hash = Sha256::default();
+        let mut hash = HashDigest::default();
         hash.input(&[y]);
         hash.input(&x);
         let mut result = [0u8; 32];
         result.copy_from_slice(&mut hash.result());
+        result
+    }
+
+    // TODO: Recovery ID
+    pub fn sign(&self, msg: &[u8]) -> [u8; 64] {
+        let k: [u8; 32] = OsRng::new().unwrap().gen();
+        let mut k = FieldElement::from_serialize(&k, &self._secp.modulo);
+        let k_point: Point = k.num.clone() * self._secp.generator();
+        let order = &self._secp.order;
+        let z = FieldElement::from_serialize(&msg.hash_digest(), order);
+        let mut r = k_point.x;
+        r.modulo = order.clone();
+        k.modulo = order.clone();
+        r.mod_num().round_mod();
+        let mut s: FieldElement = (z + (r.clone()*&self.scalar)) / k;
+        if s.num > Integer::from(order/2) {
+            s = order - s;
+        }
+        if r.is_zero() || s.is_zero() {
+            unimplemented!();
+        }
+        let mut result = [0u8; 64];
+        result[..32].copy_from_slice(&r.serialize_num());
+        result[32..].copy_from_slice(&s.serialize_num());
         result
     }
 }
@@ -181,5 +220,14 @@ mod test {
         let ecdh1 = priv_key1.ecdh(&pub_key2);
         let ecdh2 = priv_key2.ecdh(&pub_key1);
         assert_eq!(ecdh1, ecdh2);
+    }
+
+    #[test]
+    fn test_sign_verify() {
+        let priv_key = PrivateKey::new(8764321234_u128);
+        let pub_key = priv_key.generate_pubkey();
+        let msg = b"Awesome ECDSA!";
+        let sig = priv_key.sign(msg);
+        assert!(pub_key.verify(msg, sig));
     }
 }
