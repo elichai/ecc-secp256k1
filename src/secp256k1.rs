@@ -2,6 +2,7 @@
 use rug::Integer;
 use crate::{Point, Group, FieldElement};
 use std::fmt;
+use sha2::{Sha256, Digest};
 
 #[derive(Clone, PartialEq, Debug)]
 struct Secp256k1 {
@@ -106,6 +107,22 @@ impl PrivateKey {
         PublicKey { point, _secp: self._secp.clone() }
 
     }
+
+    pub fn ecdh(&self, pubkey: &PublicKey) -> [u8; 32] {
+        let point: Point = &self.scalar * pubkey.point.clone();
+        let x = point.x.serialize_num();
+        let y = if point.y.is_even() {
+            0x02
+        } else {
+            0x03
+        };
+        let mut hash = Sha256::default();
+        hash.input(&[y]);
+        hash.input(&x);
+        let mut result = [0u8; 32];
+        result.copy_from_slice(&mut hash.result());
+        result
+    }
 }
 
 impl fmt::Display for PublicKey {
@@ -152,5 +169,17 @@ mod test {
         let pubkey = privkey.generate_pubkey();
         let compress = pubkey.clone().uncompressed();
         assert_eq!(PublicKey::from_uncompressed(&compress), pubkey);
+    }
+
+    #[test]
+    fn test_ecdh() {
+        let priv_key1 = PrivateKey::new(8764321234_u128);
+        let pub_key1 = priv_key1.generate_pubkey();
+        let priv_key2 = PrivateKey::new(49234078927865834890_u128);
+        let pub_key2 = priv_key2.generate_pubkey();
+
+        let ecdh1 = priv_key1.ecdh(&pub_key2);
+        let ecdh2 = priv_key2.ecdh(&pub_key1);
+        assert_eq!(ecdh1, ecdh2);
     }
 }
