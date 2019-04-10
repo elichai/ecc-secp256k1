@@ -1,6 +1,7 @@
 mod field;
 mod point;
 mod secp256k1;
+mod hash;
 
 use self::point::*;
 use self::field::*;
