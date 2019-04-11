@@ -1,10 +1,10 @@
 [package]
 name = "ecc-secp256k1"
 version = "0.1.0"
-authors = ["elichai2"]
+authors = ["Elichai Turkel <elichai.turkel@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-rug = "1.3"
+rug = "1.3" # GMP - Big Integers
 sha2 = "0.8.0"
 rand = "0.6.5"

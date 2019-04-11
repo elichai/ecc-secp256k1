@@ -1,6 +1,8 @@
 
 use rug::Integer;
-use crate::{Point, Group, FieldElement, hash::{HashDigest, HashTrait}};
+use crate::field::FieldElement;
+use crate::point::{Point, Group};
+use crate::hash::{HashDigest, HashTrait};
 use std::{fmt, ops::Deref, io::Read};
 use rand::rngs::OsRng;
 use rand::Rng;
@@ -96,17 +98,22 @@ impl PublicKey {
         PublicKey { point, _secp: secp }
     }
 
-    pub fn verify(&self, msg: &[u8], sig: Signature) -> bool {
-        let order = &self._secp.order;
+    // TODO: Maxwell's trick: https://github.com/bitcoin-core/secp256k1/blob/abe2d3e/src/ecdsa_impl.h#L238-L253
+    #[allow(non_snake_case)]
+    fn verify_raw(&self, z: FieldElement, r: FieldElement, s: FieldElement) -> bool {
         let G = self._secp.generator();
-        let z = FieldElement::from_serialize(&msg.hash_digest(), order);
-        let r = FieldElement::from_serialize(&sig.r.0, order);
-        let s = FieldElement::from_serialize(&sig.s.0, order);
-
         let u1 = z / &s;
         let u2 = r.clone() / &s;
         let point: Point = (u1.num * G) + (u2.num * self.point.clone());
         point.x.num == r.num
+    }
+
+    pub fn verify(&self, msg: &[u8], sig: Signature) -> bool {
+        let order = &self._secp.order;
+        let z = FieldElement::from_serialize(&msg.hash_digest(), order);
+        let r = FieldElement::from_serialize(&sig.r.0, order);
+        let s = FieldElement::from_serialize(&sig.s.0, order);
+        self.verify_raw(z, r, s)
     }
 }
 
@@ -137,13 +144,9 @@ impl PrivateKey {
         result
     }
 
-    // TODO: Recovery ID
-    pub fn sign(&self, msg: &[u8]) -> Signature {
-        let k: [u8; 32] = OsRng::new().unwrap().gen();
-        let mut k = FieldElement::from_serialize(&k, &self._secp.modulo);
+    fn sign_raw(&self, mut k: FieldElement, z: FieldElement) -> Signature {
         let k_point: Point = k.num.clone() * self._secp.generator();
         let order = &self._secp.order;
-        let z = FieldElement::from_serialize(&msg.hash_digest(), order);
         let mut r = k_point.x;
         r.modulo = order.clone();
         k.modulo = order.clone();
@@ -157,6 +160,15 @@ impl PrivateKey {
         }
 
         Signature::new(&r.serialize_num(), &s.serialize_num())
+
+    }
+
+    // TODO: Recovery ID
+    pub fn sign(&self, msg: &[u8]) -> Signature {
+        let k: [u8; 32] = OsRng::new().unwrap().gen();
+        let k = FieldElement::from_serialize(&k, &self._secp.modulo);
+        let z = FieldElement::from_serialize(&msg.hash_digest(), &self._secp.order);
+        self.sign_raw(k, z)
     }
 }
 
@@ -303,6 +315,7 @@ impl AsRef<[u8]> for Scalar {
 
 #[cfg(test)]
 mod test {
+
     use super::*;
 
     #[test]
@@ -337,19 +350,15 @@ mod test {
     fn test_sign_verify() {
         let priv_key = PrivateKey::new(8764321234_u128);
         let pub_key = priv_key.generate_pubkey();
-        let compress = pub_key.clone().uncompressed();
 
         let msg = b"Liberta!";
         let sig = priv_key.sign(msg);
         assert!(pub_key.verify(msg, sig));
     }
 
-
     #[test]
     fn test_sign_der() {
         let priv_key = PrivateKey::new(8764321234_u128);
-        let pub_key = priv_key.generate_pubkey();
-        let compress = pub_key.clone().uncompressed();
         let msg = b"Liberta!";
         let sig = priv_key.sign(msg);
         let der = sig.serialize_der();
