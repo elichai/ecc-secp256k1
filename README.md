@@ -10,7 +10,9 @@ It provides both low level API (Mul/Add/Div etc.), and Private/Public Keys inter
 ## TODO:
 - [x] ECDSA
 - [x] ECDH
-- [ ] Implement DER formats.
+- [x] Implement DER formats.
+- [x] Test against a known secp256k1 library.
+- [ ] Add NIST test vectors
 - [ ] Replace random `k` with deterministic.
 - [ ] Remove the usage of GMP library.
 - [ ] Look into implementing sha2 myself.

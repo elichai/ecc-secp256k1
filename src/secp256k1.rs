@@ -1,7 +1,7 @@
 
 use rug::Integer;
 use crate::{Point, Group, FieldElement, hash::{HashDigest, HashTrait}};
-use std::fmt;
+use std::{fmt, ops::Deref, io::Read};
 use rand::rngs::OsRng;
 use rand::Rng;
 
@@ -93,22 +93,20 @@ impl PublicKey {
             unimplemented!()
         }
         let point = Point { x,y, group: secp.generator.group.clone() };
-        dbg!(point.is_on_curve());
         PublicKey { point, _secp: secp }
     }
 
-    pub fn verify(&self, msg: &[u8], sig: [u8; 64]) -> bool {
+    pub fn verify(&self, msg: &[u8], sig: Signature) -> bool {
         let order = &self._secp.order;
         let G = self._secp.generator();
         let z = FieldElement::from_serialize(&msg.hash_digest(), order);
-        let r = FieldElement::from_serialize(&sig[..32], order);
-        let s = FieldElement::from_serialize(&sig[32..], order);
+        let r = FieldElement::from_serialize(&sig.r.0, order);
+        let s = FieldElement::from_serialize(&sig.s.0, order);
+
         let u1 = z / &s;
         let u2 = r.clone() / &s;
         let point: Point = (u1.num * G) + (u2.num * self.point.clone());
-        dbg!(&point);
-        dbg!(&r);
-        dbg!(point.x.num == r.num)
+        point.x.num == r.num
     }
 }
 
@@ -140,7 +138,7 @@ impl PrivateKey {
     }
 
     // TODO: Recovery ID
-    pub fn sign(&self, msg: &[u8]) -> [u8; 64] {
+    pub fn sign(&self, msg: &[u8]) -> Signature {
         let k: [u8; 32] = OsRng::new().unwrap().gen();
         let mut k = FieldElement::from_serialize(&k, &self._secp.modulo);
         let k_point: Point = k.num.clone() * self._secp.generator();
@@ -157,10 +155,108 @@ impl PrivateKey {
         if r.is_zero() || s.is_zero() {
             unimplemented!();
         }
+
+        Signature::new(&r.serialize_num(), &s.serialize_num())
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Signature {
+    r: Scalar,
+    s: Scalar,
+}
+
+impl Signature {
+    const START: u8 = 0x30;
+    const MARKER: u8 = 0x02;
+    pub(crate) fn new(r: &[u8], s: &[u8]) -> Signature {
+        Signature {
+            r: Scalar::new(r),
+            s: Scalar::new(s),
+        }
+    }
+
+    pub fn serialize(&self) -> [u8; 64] {
         let mut result = [0u8; 64];
-        result[..32].copy_from_slice(&r.serialize_num());
-        result[32..].copy_from_slice(&s.serialize_num());
+        result[..32].copy_from_slice(&self.r.0);
+        result[32..].copy_from_slice(&self.s.0);
         result
+    }
+
+    pub fn parse(sig: [u8; 64]) -> Signature {
+        Signature {
+            r: Scalar::new(&sig[..32]),
+            s: Scalar::new(&sig[32..]),
+        }
+    }
+
+    pub fn serialize_der(&self) -> Vec<u8> {
+        let mut res = Vec::with_capacity(72);
+        let r_start = self.r.iter().position(|x| *x!=0).unwrap();
+        let s_start = self.s.iter().position(|x| *x!=0).unwrap();
+        let r = &self.r[r_start..];
+        let s = &self.s[s_start..];
+        let data_length = r.len() + s.len() + 4; // 4 =  2 markers + 2 lengths. (res.len() - start - data_length)
+
+        res.push(Self::START);
+        res.push(data_length as u8);
+
+        res.push(Self::MARKER);
+        res.push(r.len() as u8);
+        res.extend_from_slice(r);
+
+        res.push(Self::MARKER);
+        res.push(s.len() as u8);
+        res.extend_from_slice(s);
+        res
+    }
+
+    pub fn parse_der(sig: &[u8]) -> Signature {
+        fn take<R: Read>(reader: &mut R) -> u8 {
+            let mut b = [0];
+            reader.read(&mut b).unwrap();
+            b[0]
+        }
+        let mut r = [0u8; 32];
+        let mut s = [0u8; 32];
+        let mut reader = sig;
+        if take(&mut reader) != Self::START {
+            unimplemented!();
+        }
+        let data_length = take(&mut reader) as usize;
+
+        if take(&mut reader) != Self::MARKER {
+            unimplemented!();
+        }
+        let r_length = take(&mut reader) as usize;
+        reader.read_exact(&mut r[32-r_length..]).unwrap();
+
+        if take(&mut reader) != Self::MARKER {
+            unimplemented!();
+        }
+        let s_length = take(&mut reader) as usize;
+        reader.read_exact(&mut s[32-s_length..]).unwrap();
+
+        if data_length != r_length + s_length + 4 {
+            unimplemented!();
+        }
+
+        Signature {
+            r: Scalar(r),
+            s: Scalar(s),
+        }
+    }
+}
+
+#[derive(Default, PartialEq, Eq, Debug)]
+struct Scalar(pub [u8;32]);
+
+
+impl Scalar {
+    pub fn new(slice: &[u8]) -> Scalar {
+        let mut res = Scalar::default();
+        res.0.copy_from_slice(slice);
+        res
     }
 }
 
@@ -188,6 +284,21 @@ impl Default for Secp256k1 {
         Secp256k1::new()
     }
 }
+
+impl Deref for Scalar {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for Scalar {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 
 
 #[cfg(test)]
@@ -226,8 +337,22 @@ mod test {
     fn test_sign_verify() {
         let priv_key = PrivateKey::new(8764321234_u128);
         let pub_key = priv_key.generate_pubkey();
-        let msg = b"Awesome ECDSA!";
+        let compress = pub_key.clone().uncompressed();
+
+        let msg = b"Liberta!";
         let sig = priv_key.sign(msg);
         assert!(pub_key.verify(msg, sig));
+    }
+
+
+    #[test]
+    fn test_sign_der() {
+        let priv_key = PrivateKey::new(8764321234_u128);
+        let pub_key = priv_key.generate_pubkey();
+        let compress = pub_key.clone().uncompressed();
+        let msg = b"Liberta!";
+        let sig = priv_key.sign(msg);
+        let der = sig.serialize_der();
+        assert_eq!(sig, Signature::parse_der(&der));
     }
 }
