@@ -1,5 +1,4 @@
-
-use rug::Integer;
+use rug::{Integer, integer::Order};
 use crate::field::FieldElement;
 use crate::point::{Point, Group};
 use crate::hash::{HashDigest, HashTrait};
@@ -8,7 +7,7 @@ use rand::rngs::OsRng;
 use rand::Rng;
 
 #[derive(Clone, PartialEq, Debug)]
-struct Secp256k1 {
+pub struct Secp256k1 {
     pub modulo: Integer,
     pub order: Integer,
     generator: Point
@@ -40,6 +39,21 @@ impl Secp256k1 {
     pub fn generator(&self) -> Point {
         self.generator.clone()
     }
+
+    pub fn get_fe(&self, num: &[u8]) -> FieldElement {
+        FieldElement::from_serialize(&num, &self.modulo)
+    }
+
+    pub fn get_pubkey(&self, x: &[u8], y: &[u8]) -> PublicKey {
+        let x = FieldElement::from_serialize(x, &self.modulo);
+        let y = FieldElement::from_serialize(y, &self.modulo);
+        let point = Point { x, y, group: self.generator.group.clone() };
+        if !point.is_on_curve() {
+            unimplemented!();
+        }
+        PublicKey { point, _secp: self.clone() }
+    }
+
 }
 
 pub struct PrivateKey {
@@ -81,6 +95,9 @@ impl PublicKey {
         let x = FieldElement::from_serialize(&ser[1..33], &secp.modulo);
         let y = FieldElement::from_serialize(&ser[33..65], &secp.modulo);
         let point = Point { x, y, group: secp.generator.group.clone() };
+        if !point.is_on_curve() {
+            unimplemented!();
+        }
         PublicKey { point, _secp: secp }
     }
 
@@ -100,17 +117,19 @@ impl PublicKey {
 
     // TODO: Maxwell's trick: https://github.com/bitcoin-core/secp256k1/blob/abe2d3e/src/ecdsa_impl.h#L238-L253
     #[allow(non_snake_case)]
-    fn verify_raw(&self, z: FieldElement, r: FieldElement, s: FieldElement) -> bool {
+    pub(crate) fn verify_raw(&self, z: FieldElement, r: FieldElement, s: FieldElement) -> bool {
         let G = self._secp.generator();
         let u1 = z / &s;
         let u2 = r.clone() / &s;
         let point: Point = (u1.num * G) + (u2.num * self.point.clone());
-        point.x.num == r.num
+        point.x.num == r.num // Sometimes r.num is only 31 bytes. need to take a closer look.   
     }
 
     pub fn verify(&self, msg: &[u8], sig: Signature) -> bool {
         let order = &self._secp.order;
-        let z = FieldElement::from_serialize(&msg.hash_digest(), order);
+        let msg_hash = msg.hash_digest();
+        println!("{:?}", msg_hash);
+        let z = FieldElement::from_serialize(&msg_hash, order);
         let r = FieldElement::from_serialize(&sig.r.0, order);
         let s = FieldElement::from_serialize(&sig.s.0, order);
         self.verify_raw(z, r, s)
@@ -118,6 +137,7 @@ impl PublicKey {
 }
 
 impl PrivateKey {
+    const ORDER: Order = Order::MsfLe;
     pub fn new<I: Into<Integer>>(key: I) -> Self {
         PrivateKey {scalar: key.into(), _secp: Default::default() }
     }
@@ -144,7 +164,7 @@ impl PrivateKey {
         result
     }
 
-    fn sign_raw(&self, mut k: FieldElement, z: FieldElement) -> Signature {
+    pub(crate) fn sign_raw(&self, mut k: FieldElement, z: FieldElement) -> Signature {
         let k_point: Point = k.num.clone() * self._secp.generator();
         let order = &self._secp.order;
         let mut r = k_point.x;
@@ -166,9 +186,15 @@ impl PrivateKey {
     // TODO: Recovery ID
     pub fn sign(&self, msg: &[u8]) -> Signature {
         let k: [u8; 32] = OsRng::new().unwrap().gen();
+        let msg_hash = msg.hash_digest();
         let k = FieldElement::from_serialize(&k, &self._secp.modulo);
-        let z = FieldElement::from_serialize(&msg.hash_digest(), &self._secp.order);
+        let z = FieldElement::from_serialize(&msg_hash, &self._secp.order);
         self.sign_raw(k, z)
+    }
+
+    pub fn from_serialized(ser: &[u8]) -> PrivateKey {
+        let i = Integer::from_digits(ser, Order::MsfLe);
+        PrivateKey::new(i)
     }
 }
 

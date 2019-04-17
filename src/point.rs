@@ -58,6 +58,18 @@ impl Point {
         }
     }
 
+    pub fn new_serialized_with_group<I>(x: &[u8], y: &[u8], modulo: I, group: Group) -> Result<Self, ()>
+        where I: Into<Integer> {
+        let x = FieldElement::from_serialize(&x, modulo);
+        let y = FieldElement::from_serialize(&y, x.modulo.clone());
+        let point = Self { x, y, group };
+        if !point.is_on_curve() {
+            Err(())
+        } else {
+            Ok(point)
+        }
+    }
+
     pub fn gen_zero(&self) -> Self {
         let x = FieldElement::new(0, &self.x.modulo);
         let y = FieldElement::new(0, &self.x.modulo);

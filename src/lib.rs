@@ -2,13 +2,15 @@ mod field;
 mod point;
 mod secp256k1;
 mod hash;
+pub mod internal;
 
-pub use secp256k1::{Signature, PublicKey, PrivateKey};
+mod test_rust_secp256k1;
+
+pub use crate::secp256k1::{Signature, PublicKey, PrivateKey};
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use self::secp256k1::*;
     use rug::Integer;
 
     #[test]
