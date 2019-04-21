@@ -1,5 +1,5 @@
-use std::{ops::*, fmt};
-use rug::{Integer, integer::Order, ops::NegAssign};
+use rug::{integer::Order, ops::NegAssign, Integer};
+use std::{fmt, ops::*};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FieldElement {
@@ -62,7 +62,7 @@ impl FieldElement {
     }
 
     pub fn mod_num(&mut self) -> &mut Self {
-        self.num =  self.num.clone() % &self.modulo;
+        self.num = self.num.clone() % &self.modulo;
         self
     }
 
@@ -175,10 +175,8 @@ impl Div for FieldElement {
         let mut res = self * other;
         res.round_mod();
         res
-
     }
 }
-
 
 impl Div<&FieldElement> for FieldElement {
     type Output = FieldElement;
@@ -192,7 +190,6 @@ impl Div<&FieldElement> for FieldElement {
         let mut res = self * other;
         res.round_mod();
         res
-
     }
 }
 

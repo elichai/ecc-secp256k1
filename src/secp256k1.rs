@@ -1,16 +1,20 @@
-use rug::{Integer, integer::Order};
 use crate::field::FieldElement;
-use crate::point::{Point, Group};
 use crate::hash::{HashDigest, HashTrait};
-use std::{fmt, ops::Deref, io::Read};
+use crate::point::{Group, Point};
 use rand::rngs::OsRng;
 use rand::Rng;
+use rug::{integer::Order, Integer};
+use std::{
+    fmt,
+    io::{BufReader, Read},
+    ops::Deref,
+};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Secp256k1 {
     pub modulo: Integer,
     pub order: Integer,
-    generator: Point
+    generator: Point,
 }
 
 impl Secp256k1 {
@@ -53,12 +57,11 @@ impl Secp256k1 {
         }
         PublicKey { point, _secp: self.clone() }
     }
-
 }
 
 pub struct PrivateKey {
     scalar: Integer,
-    _secp : Secp256k1,
+    _secp: Secp256k1,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -78,12 +81,9 @@ impl PublicKey {
 
     pub fn compressed(self) -> [u8; 33] {
         let mut result = [0u8; 33];
-        result[1..].copy_from_slice(&self.point.x.serialize_num());
-        result[0] = if self.point.y.is_even() {
-            0x02
-        } else {
-            0x03
-        };
+        let x = self.point.x.serialize_num();
+        result[1 + (32 - x.len())..].copy_from_slice(&x);
+        result[0] = if self.point.y.is_even() { 0x02 } else { 0x03 };
         result
     }
 
@@ -111,7 +111,7 @@ impl PublicKey {
         } else if ser[0] != 0x02 && ser[0] != 0x03 {
             unimplemented!()
         }
-        let point = Point { x,y, group: secp.generator.group.clone() };
+        let point = Point { x, y, group: secp.generator.group.clone() };
         PublicKey { point, _secp: secp }
     }
 
@@ -122,13 +122,12 @@ impl PublicKey {
         let u1 = z / &s;
         let u2 = r.clone() / &s;
         let point: Point = (u1.num * G) + (u2.num * self.point.clone());
-        point.x.num == r.num // Sometimes r.num is only 31 bytes. need to take a closer look.   
+        point.x.num == r.num // Sometimes r.num is only 31 bytes. need to take a closer look.
     }
 
     pub fn verify(&self, msg: &[u8], sig: Signature) -> bool {
         let order = &self._secp.order;
         let msg_hash = msg.hash_digest();
-        println!("{:?}", msg_hash);
         let z = FieldElement::from_serialize(&msg_hash, order);
         let r = FieldElement::from_serialize(&sig.r.0, order);
         let s = FieldElement::from_serialize(&sig.s.0, order);
@@ -137,30 +136,24 @@ impl PublicKey {
 }
 
 impl PrivateKey {
-    const ORDER: Order = Order::MsfLe;
     pub fn new<I: Into<Integer>>(key: I) -> Self {
-        PrivateKey {scalar: key.into(), _secp: Default::default() }
+        PrivateKey { scalar: key.into(), _secp: Default::default() }
     }
 
     pub fn generate_pubkey(&self) -> PublicKey {
         let point = &self.scalar * self._secp.generator();
         PublicKey { point, _secp: self._secp.clone() }
-
     }
 
     pub fn ecdh(&self, pubkey: &PublicKey) -> [u8; 32] {
         let point: Point = &self.scalar * pubkey.point.clone();
         let x = point.x.serialize_num();
-        let y = if point.y.is_even() {
-            0x02
-        } else {
-            0x03
-        };
+        let y = if point.y.is_even() { 0x02 } else { 0x03 };
         let mut hash = HashDigest::default();
         hash.input(&[y]);
         hash.input(&x);
         let mut result = [0u8; 32];
-        result.copy_from_slice(&mut hash.result());
+        result.copy_from_slice(&hash.result());
         result
     }
 
@@ -171,8 +164,8 @@ impl PrivateKey {
         r.modulo = order.clone();
         k.modulo = order.clone();
         r.mod_num().round_mod();
-        let mut s: FieldElement = (z + (r.clone()*&self.scalar)) / k;
-        if s.num > Integer::from(order/2) {
+        let mut s: FieldElement = (z + (r.clone() * &self.scalar)) / k;
+        if s.num > Integer::from(order / 2) {
             s = order - s;
         }
         if r.is_zero() || s.is_zero() {
@@ -180,7 +173,6 @@ impl PrivateKey {
         }
 
         Signature::new(&r.serialize_num(), &s.serialize_num())
-
     }
 
     // TODO: Recovery ID
@@ -208,10 +200,7 @@ impl Signature {
     const START: u8 = 0x30;
     const MARKER: u8 = 0x02;
     pub(crate) fn new(r: &[u8], s: &[u8]) -> Signature {
-        Signature {
-            r: Scalar::new(r),
-            s: Scalar::new(s),
-        }
+        Signature { r: Scalar::new(r), s: Scalar::new(s) }
     }
 
     pub fn serialize(&self) -> [u8; 64] {
@@ -222,10 +211,7 @@ impl Signature {
     }
 
     pub fn parse(sig: [u8; 64]) -> Signature {
-        Signature {
-            r: Scalar::new(&sig[..32]),
-            s: Scalar::new(&sig[32..]),
-        }
+        Signature { r: Scalar::new(&sig[..32]), s: Scalar::new(&sig[32..]) }
     }
 
     pub fn serialize_der(&self) -> Vec<u8> {
@@ -306,21 +292,18 @@ impl Signature {
             unimplemented!();
         }
 
-        Signature {
-            r: Scalar(r),
-            s: Scalar(s),
-        }
+        Signature { r: Scalar(r), s: Scalar(s) }
     }
 }
 
 #[derive(Default, PartialEq, Eq, Debug)]
-struct Scalar(pub [u8;32]);
-
+struct Scalar(pub [u8; 32]);
 
 impl Scalar {
     pub fn new(slice: &[u8]) -> Scalar {
         let mut res = Scalar::default();
-        res.0.copy_from_slice(slice);
+        let res_len = res.len();
+        res.0[res_len - slice.len()..].copy_from_slice(slice);
         res
     }
 }
@@ -339,10 +322,9 @@ impl fmt::Display for Secp256k1 {
 
 impl From<Point> for PublicKey {
     fn from(point: Point) -> PublicKey {
-        PublicKey{ point, _secp: Default::default() }
+        PublicKey { point, _secp: Default::default() }
     }
 }
-
 
 impl Default for Secp256k1 {
     fn default() -> Secp256k1 {
@@ -363,8 +345,6 @@ impl AsRef<[u8]> for Scalar {
         &self.0
     }
 }
-
-
 
 #[cfg(test)]
 mod test {

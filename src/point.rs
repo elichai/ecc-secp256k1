@@ -1,6 +1,6 @@
-use std::{ops::*, fmt};
-use rug::Integer;
 use crate::field::*;
+use rug::Integer;
+use std::{fmt, ops::*};
 
 #[derive(Clone, PartialEq)]
 pub struct Group {
@@ -10,7 +10,7 @@ pub struct Group {
 
 impl Group {
     pub fn new<I: Into<Integer>, T: Into<Integer>>(a: I, b: T) -> Self {
-        Self{ a: a.into(), b: b.into() }
+        Self { a: a.into(), b: b.into() }
     }
 
     pub fn get_y(&self, x: &FieldElement) -> FieldElement {
@@ -40,14 +40,22 @@ impl fmt::Debug for Point {
 }
 
 impl Point {
-    pub fn new<I,T,V>(x: I, y: T, modulo: V) -> Result<Self, ()>
-    where I: Into<Integer>, T: Into<Integer>, V: Into<Integer> {
-        let group = Group::new(0,7);
-        Self::new_with_group(x,y,modulo,group)
+    pub fn new<I, T, V>(x: I, y: T, modulo: V) -> Result<Self, ()>
+    where
+        I: Into<Integer>,
+        T: Into<Integer>,
+        V: Into<Integer>,
+    {
+        let group = Group::new(0, 7);
+        Self::new_with_group(x, y, modulo, group)
     }
 
-    pub fn new_with_group<I,T,V>(x: I, y: T, modulo: V, group: Group) -> Result<Self, ()>
-        where I: Into<Integer>, T: Into<Integer>, V: Into<Integer> {
+    pub fn new_with_group<I, T, V>(x: I, y: T, modulo: V, group: Group) -> Result<Self, ()>
+    where
+        I: Into<Integer>,
+        T: Into<Integer>,
+        V: Into<Integer>,
+    {
         let x = FieldElement::new(x, modulo);
         let y = FieldElement::new(y, x.modulo.clone());
         let point = Self { x, y, group };
@@ -59,7 +67,9 @@ impl Point {
     }
 
     pub fn new_serialized_with_group<I>(x: &[u8], y: &[u8], modulo: I, group: Group) -> Result<Self, ()>
-        where I: Into<Integer> {
+    where
+        I: Into<Integer>,
+    {
         let x = FieldElement::from_serialize(&x, modulo);
         let y = FieldElement::from_serialize(&y, x.modulo.clone());
         let point = Self { x, y, group };
@@ -86,8 +96,7 @@ impl Point {
         if self.x != other.x {
             (self.y.clone() - other.y.clone()) / (self.x.clone() - other.x.clone())
         } else {
-            (3 * self.x.clone().pow_u(2) + &self.group.a) /
-                (2 * self.y.clone())
+            (3 * self.x.clone().pow_u(2) + &self.group.a) / (2 * self.y.clone())
         }
     }
 }
@@ -110,7 +119,7 @@ impl Add for Point {
             let m = self.get_slope(&other); // Returns the slope of the line
             let x = m.clone().pow_u(2) - &self.x - other.x; // takes the slope to the power of 2 minus both X's
             let y = m * (self.x - &x) - self.y; // negative of y-y1=m(x-x1) - Simple line equation
-            Self {x,y, group: self.group}
+            Self { x, y, group: self.group }
         }
     }
 }

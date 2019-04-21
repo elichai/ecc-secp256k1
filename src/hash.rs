@@ -1,8 +1,8 @@
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 #[derive(Default)]
 pub(crate) struct HashDigest {
-    h: Sha256
+    h: Sha256,
 }
 
 impl HashDigest {
@@ -21,9 +21,10 @@ impl HashDigest {
     }
 }
 
-
 pub trait HashTrait<T> {
-    fn hash_digest(&self) -> T where T: Sized;
+    fn hash_digest(&self) -> T
+    where
+        T: Sized;
 }
 
 impl HashTrait<[u8; 32]> for [u8] {
