@@ -229,11 +229,24 @@ impl Signature {
     }
 
     pub fn serialize_der(&self) -> Vec<u8> {
+        fn generate_33_leading_zeros(a: &[u8]) -> [u8; 33] {
+            let mut res = [0u8; 33];
+            res[1..].copy_from_slice(a);
+            res
+        }
         let mut res = Vec::with_capacity(72);
-        let r_start = self.r.iter().position(|x| *x!=0).unwrap();
-        let s_start = self.s.iter().position(|x| *x!=0).unwrap();
-        let r = &self.r[r_start..];
-        let s = &self.s[s_start..];
+        let r = generate_33_leading_zeros(&self.r);
+        let s = generate_33_leading_zeros(&self.s);
+        let mut r_start = r.iter().position(|x| *x != 0).unwrap();
+        let mut s_start = s.iter().position(|x| *x != 0).unwrap();
+        if r[r_start] >= 128 {
+            r_start -= 1;
+        }
+        if s[s_start] >= 128 {
+            s_start -= 1;
+        }
+        let r = &r[r_start..];
+        let s = &s[s_start..];
         let data_length = r.len() + s.len() + 4; // 4 =  2 markers + 2 lengths. (res.len() - start - data_length)
 
         res.push(Self::START);
@@ -252,12 +265,14 @@ impl Signature {
     pub fn parse_der(sig: &[u8]) -> Signature {
         fn take<R: Read>(reader: &mut R) -> u8 {
             let mut b = [0];
-            reader.read(&mut b).unwrap();
+            assert_eq!(reader.read(&mut b).unwrap(), 1);
             b[0]
         }
+        let mut sum_size = 4;
+
         let mut r = [0u8; 32];
         let mut s = [0u8; 32];
-        let mut reader = sig;
+        let mut reader = BufReader::new(sig);
         if take(&mut reader) != Self::START {
             unimplemented!();
         }
@@ -266,16 +281,28 @@ impl Signature {
         if take(&mut reader) != Self::MARKER {
             unimplemented!();
         }
-        let r_length = take(&mut reader) as usize;
-        reader.read_exact(&mut r[32-r_length..]).unwrap();
+
+        let mut r_length = take(&mut reader) as usize;
+        sum_size += r_length;
+        if r_length == 33 {
+            assert_eq!(take(&mut reader), 0);
+            r_length -= 1;
+        }
+        reader.read_exact(&mut r[32 - r_length..]).unwrap();
 
         if take(&mut reader) != Self::MARKER {
             unimplemented!();
         }
-        let s_length = take(&mut reader) as usize;
-        reader.read_exact(&mut s[32-s_length..]).unwrap();
 
-        if data_length != r_length + s_length + 4 {
+        let mut s_length = take(&mut reader) as usize;
+        sum_size += s_length;
+        if s_length == 33 {
+            assert_eq!(take(&mut reader), 0);
+            s_length -= 1;
+        }
+        reader.read_exact(&mut s[32 - s_length..]).unwrap();
+
+        if data_length != sum_size {
             unimplemented!();
         }
 

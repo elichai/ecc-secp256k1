@@ -10,11 +10,8 @@ use test_secp256k1::{
     Secp256k1 as TestSecp256k1, SecretKey as TestPrivateKey, Signature as TestSignature,
 };
 
-// TODO: Everything DER related fails some times. need to recheck my implementation.
-
-#[ignore]
 #[test]
-pub fn test_sign_der() {
+fn test_cmp_sign_der() {
     let mut rng = thread_rng();
 
     let key: [u8; 32] = rng.gen();
@@ -36,7 +33,7 @@ pub fn test_sign_der() {
 }
 
 #[test]
-pub fn test_sign_compact() {
+fn test_cmp_sign_compact() {
     let mut rng = thread_rng();
 
     let key: [u8; 32] = rng.gen();
