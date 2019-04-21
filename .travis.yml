@@ -7,7 +7,6 @@ rust:
 script:
   - cargo build --verbose
   - cargo test --verbose
-  - cargo test --examples
 
 before_script:
   - if [ ${TRAVIS_RUST_VERSION} == "stable" ]; then
