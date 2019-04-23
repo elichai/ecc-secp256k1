@@ -3,6 +3,7 @@ mod hash;
 pub mod internal;
 mod point;
 mod secp256k1;
+mod u256;
 
 mod test_rust_secp256k1;
 
