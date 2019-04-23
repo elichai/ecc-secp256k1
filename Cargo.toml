@@ -10,4 +10,5 @@ sha2 = "0.8.0"
 rand = "0.6.5"
 
 [dev-dependencies]
-secp256k1 = { version = "0.12.2", features = ["rand" ]}
+secp256k1 = { version = "0.12.2", features = ["rand" ] }
+numext-fixed-uint = "0.1.4"
