@@ -249,6 +249,7 @@ mod tests {
         assert_eq!(test.to_be_bytes(), my.into_be_bytes());
     }
     #[test]
+    #[ignore]
     fn test_be_mul() {
         let mut rng = thread_rng();
         let a: u128 = rng.gen();
@@ -266,6 +267,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_specific() {
         let real_be = [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 187, 38, 228, 19, 155, 141, 172, 191, 166, 217, 27, 236, 100, 114, 83, 63,
@@ -279,6 +281,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_other_specific() {
         let real_be = [
             0, 0, 0, 0, 0, 0, 0, 0, 205, 24, 175, 194, 81, 32, 160, 12, 252, 10, 19, 243, 165, 227, 59, 3, 54, 221, 60, 74, 8, 252,

@@ -8,6 +8,7 @@ use std::{
     fmt,
     io::{BufReader, Read},
     ops::Deref,
+    sync::Once,
 };
 
 #[derive(Clone, PartialEq, Debug)]
@@ -55,19 +56,17 @@ impl Secp256k1 {
         if !point.is_on_curve() {
             unimplemented!();
         }
-        PublicKey { point, _secp: self.clone() }
+        PublicKey { point }
     }
 }
 
 pub struct PrivateKey {
-    scalar: Integer,
-    _secp: Secp256k1,
+    scalar: Integer
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PublicKey {
     point: Point,
-    _secp: Secp256k1,
 }
 
 impl PublicKey {
@@ -88,7 +87,7 @@ impl PublicKey {
     }
 
     pub fn from_uncompressed(ser: &[u8]) -> PublicKey {
-        let secp = Secp256k1::new();
+        let secp = get_context();
         if ser[0] != 0x04 {
             unimplemented!()
         }
@@ -98,11 +97,11 @@ impl PublicKey {
         if !point.is_on_curve() {
             unimplemented!();
         }
-        PublicKey { point, _secp: secp }
+        PublicKey { point, }
     }
 
     pub fn from_compressed(ser: &[u8]) -> PublicKey {
-        let secp = Secp256k1::new();
+        let secp = get_context();
         let x = FieldElement::from_serialize(&ser[1..33], &secp.modulo);
         let mut y = secp.generator.group.get_y(&x);
         let is_even = y.is_even();
@@ -112,13 +111,13 @@ impl PublicKey {
             unimplemented!()
         }
         let point = Point { x, y, group: secp.generator.group.clone() };
-        PublicKey { point, _secp: secp }
+        PublicKey { point }
     }
 
     // TODO: Maxwell's trick: https://github.com/bitcoin-core/secp256k1/blob/abe2d3e/src/ecdsa_impl.h#L238-L253
     #[allow(non_snake_case)]
     pub(crate) fn verify_raw(&self, z: FieldElement, r: FieldElement, s: FieldElement) -> bool {
-        let G = self._secp.generator();
+        let G = get_context().generator();
         let u1 = z / &s;
         let u2 = r.clone() / &s;
         let point: Point = (u1.num * G) + (u2.num * self.point.clone());
@@ -126,7 +125,7 @@ impl PublicKey {
     }
 
     pub fn verify(&self, msg: &[u8], sig: Signature) -> bool {
-        let order = &self._secp.order;
+        let order = &get_context().order;
         let msg_hash = msg.hash_digest();
         let z = FieldElement::from_serialize(&msg_hash, order);
         let r = FieldElement::from_serialize(&sig.r.0, order);
@@ -137,12 +136,12 @@ impl PublicKey {
 
 impl PrivateKey {
     pub fn new<I: Into<Integer>>(key: I) -> Self {
-        PrivateKey { scalar: key.into(), _secp: Default::default() }
+        PrivateKey { scalar: key.into() }
     }
 
     pub fn generate_pubkey(&self) -> PublicKey {
-        let point = &self.scalar * self._secp.generator();
-        PublicKey { point, _secp: self._secp.clone() }
+        let point = &self.scalar * get_context().generator();
+        PublicKey { point }
     }
 
     pub fn ecdh(&self, pubkey: &PublicKey) -> [u8; 32] {
@@ -158,8 +157,9 @@ impl PrivateKey {
     }
 
     pub(crate) fn sign_raw(&self, mut k: FieldElement, z: FieldElement) -> Signature {
-        let k_point: Point = k.num.clone() * self._secp.generator();
-        let order = &self._secp.order;
+        let secp = get_context();
+        let k_point: Point = k.num.clone() * secp.generator();
+        let order = &secp.order;
         let mut r = k_point.x;
         r.modulo = order.clone();
         k.modulo = order.clone();
@@ -177,10 +177,11 @@ impl PrivateKey {
 
     // TODO: Recovery ID
     pub fn sign(&self, msg: &[u8]) -> Signature {
+        let secp = get_context();
         let k: [u8; 32] = OsRng::new().unwrap().gen();
         let msg_hash = msg.hash_digest();
-        let k = FieldElement::from_serialize(&k, &self._secp.modulo);
-        let z = FieldElement::from_serialize(&msg_hash, &self._secp.order);
+        let k = FieldElement::from_serialize(&k, &secp.modulo);
+        let z = FieldElement::from_serialize(&msg_hash, &secp.order);
         self.sign_raw(k, z)
     }
 
@@ -308,6 +309,20 @@ impl Scalar {
     }
 }
 
+
+
+static mut CONTEXT: Option<Secp256k1> = None;
+
+
+pub fn get_context() -> &'static Secp256k1 {
+    static INIT_CONTEXT: Once = Once::new();
+    INIT_CONTEXT.call_once(|| {
+        unsafe { CONTEXT = Some(Default::default()); }
+    });
+    unsafe { CONTEXT.as_ref().unwrap() }
+}
+
+
 impl fmt::Display for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Public: {{ X: {:#X}, Y: {:#X} }}", self.point.x.inner(), self.point.y.inner())
@@ -322,7 +337,7 @@ impl fmt::Display for Secp256k1 {
 
 impl From<Point> for PublicKey {
     fn from(point: Point) -> PublicKey {
-        PublicKey { point, _secp: Default::default() }
+        PublicKey { point }
     }
 }
 

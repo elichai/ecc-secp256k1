@@ -111,7 +111,6 @@ impl Add for Point {
         } else if other.x.is_infinity() {
             self
         } else if self.x == other.x && self.y != other.y {
-            let inf = FieldElement::infinity(&self.x.modulo);
             Self { x: inf.clone(), y: inf.clone(), group: self.group }
         } else if self == other && self.y.is_zero() {
             Self { x: inf.clone(), y: inf.clone(), group: self.group }
