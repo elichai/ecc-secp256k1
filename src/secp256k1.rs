@@ -132,6 +132,25 @@ impl PublicKey {
         let s = FieldElement::from_serialize(&sig.s.0, order);
         self.verify_raw(z, r, s)
     }
+
+    #[allow(non_snake_case)]
+    pub fn verify_schnorr(&self, msg: &[u8], sig: Signature) -> bool {
+        let G = get_context().generator();
+        let order = &get_context().order;
+        let r = FieldElement::from_serialize(&sig.r.0, order);
+        let s = FieldElement::from_serialize(&sig.s.0, order);
+        let m = msg.hash_digest();
+
+        let mut e = get_e(r.clone(), self.clone(), m);
+        e.reflect();
+        let R = (s.num * G) + e.num * &self.point;
+        if R.is_on_infinity() {
+            unimplemented!();
+        }
+        // TODO: Check that the Jacobi symbol is 1 (https://en.wikipedia.org/wiki/Jacobi_symbol)
+        R.x.num == r.num
+    }
+
 }
 
 impl PrivateKey {
@@ -156,7 +175,7 @@ impl PrivateKey {
         result
     }
 
-    pub(crate) fn sign_raw(&self, mut k: FieldElement, z: FieldElement) -> Signature {
+    pub(crate) fn sign_raw(d: &Integer, mut k: FieldElement, z: FieldElement) -> Signature {
         let secp = get_context();
         let k_point: Point = k.num.clone() * secp.generator();
         let order = &secp.order;
@@ -164,7 +183,7 @@ impl PrivateKey {
         r.modulo = order.clone();
         k.modulo = order.clone();
         r.mod_num().round_mod();
-        let mut s: FieldElement = (z + (r.clone() * &self.scalar)) / k;
+        let mut s: FieldElement = (z + (r.clone() * d)) / k;
         if s.num > Integer::from(order / 2) {
             s = order - s;
         }
@@ -182,13 +201,50 @@ impl PrivateKey {
         let msg_hash = msg.hash_digest();
         let k = FieldElement::from_serialize(&k, &secp.modulo);
         let z = FieldElement::from_serialize(&msg_hash, &secp.order);
-        self.sign_raw(k, z)
+        Self::sign_raw(&self.scalar, k, z)
+    }
+
+    #[allow(non_snake_case)]
+    pub fn sign_schnorr(&self, msg: &[u8]) -> Signature {
+        let secp = get_context();
+        let m = msg.hash_digest();
+        // Deterministic k, could be random.
+        let mut k = HashDigest::new();
+        k.input(&self.serialize());
+        k.input(&m);
+        let k = k.result();
+        let mut k = FieldElement::from_serialize(&k, &secp.order);
+        k.mod_num();
+        // TODO: Check the Jacobi symbol and if not 1 subtract by the group order (https://en.wikipedia.org/wiki/Jacobi_symbol)
+        if k.is_zero() {
+            unimplemented!();
+        }
+        let R = &k.num * secp.generator();
+        let e = get_e(R.x.clone(), self.generate_pubkey(),  m);
+        let s = k + e * &self.scalar;
+        let s = s.serialize_num();
+        let r = R.x.serialize_num();
+        Signature::new(&r, &s)
+    }
+
+    fn serialize(&self) -> Vec<u8> {
+        self.scalar.to_digits(Order::MsfLe)
     }
 
     pub fn from_serialized(ser: &[u8]) -> PrivateKey {
         let i = Integer::from_digits(ser, Order::MsfLe);
         PrivateKey::new(i)
     }
+}
+
+#[allow(non_snake_case)]
+fn get_e(xR: FieldElement, pubkey: PublicKey, msg: [u8; 32]) -> FieldElement {
+    let secp = get_context();
+    let mut e = HashDigest::new();
+    e.input(&xR.serialize_num());
+    e.input(&pubkey.compressed());
+    e.input(&msg);
+    FieldElement::from_serialize(&e.result(), &secp.order)
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -411,5 +467,15 @@ mod test {
         let sig = priv_key.sign(msg);
         let der = sig.serialize_der();
         assert_eq!(sig, Signature::parse_der(&der));
+    }
+
+    #[test]
+    fn test_sign_verify_schnorr() {
+        let priv_key = PrivateKey::new(532557312_u128);
+        let pub_key = priv_key.generate_pubkey();
+
+        let msg = b"HODL!";
+        let sig = priv_key.sign_schnorr(msg);
+        assert!(pub_key.verify_schnorr(msg, sig));
     }
 }
