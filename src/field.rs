@@ -75,7 +75,7 @@ impl FieldElement {
     pub fn reflect(&mut self) {
         self.num.neg_assign();
         self.round_mod();
-        self.num = self.num.clone() & &self.modulo;
+        self.num = self.num.clone() % &self.modulo;
     }
 
     pub fn serialize_num(self) -> Vec<u8> {
