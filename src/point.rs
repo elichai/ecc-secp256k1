@@ -92,6 +92,11 @@ impl Point {
     }
 
     #[inline(always)]
+    pub fn is_on_infinity(&self) -> bool {
+        self.x.is_infinity() || self.y.is_infinity()
+    }
+
+    #[inline(always)]
     fn get_slope(&self, other: &Point) -> FieldElement {
         if self.x != other.x {
             (self.y.clone() - other.y.clone()) / (self.x.clone() - other.x.clone())
@@ -125,7 +130,7 @@ impl Add for Point {
 macro_rules! mul_impl_point {
     ($($t:ty)*) => ($(
        impl Mul<$t> for Point {
-        type Output = Point;
+            type Output = Point;
             #[allow(clippy::suspicious_arithmetic_impl)]
             #[inline(always)]
             fn mul(self, mut other: $t) -> Self {
@@ -142,8 +147,8 @@ macro_rules! mul_impl_point {
             }
         }
         impl Mul<&$t> for Point {
-        type Output = Point;
-             #[allow(clippy::suspicious_arithmetic_impl)]
+            type Output = Point;
+            #[allow(clippy::suspicious_arithmetic_impl)]
             #[inline(always)]
             fn mul(self, other: &$t) -> Self {
                 let mut other = other.clone();
@@ -160,7 +165,7 @@ macro_rules! mul_impl_point {
             }
         }
         impl Mul<Point> for $t {
-        type Output = Point;
+            type Output = Point;
             #[allow(clippy::suspicious_arithmetic_impl)]
             #[inline(always)]
             fn mul(mut self, other: Point) -> Point {
@@ -177,10 +182,45 @@ macro_rules! mul_impl_point {
             }
         }
         impl Mul<Point> for &$t {
-        type Output = Point;
+            type Output = Point;
             #[allow(clippy::suspicious_arithmetic_impl)]
             #[inline(always)]
             fn mul(self, other: Point) -> Point {
+                let mut s = self.clone();
+                let mut result = other.gen_zero();
+                let mut adding = other.clone();
+                while s != 0 {
+                    if (s.clone() & 1) == 1 {
+                        result = result.clone() + adding.clone();
+                    }
+                    adding = adding.clone() + adding;
+                    s >>= 1;
+                }
+                result
+            }
+        }
+        impl Mul<&Point> for $t {
+            type Output = Point;
+            #[allow(clippy::suspicious_arithmetic_impl)]
+            #[inline(always)]
+            fn mul(mut self, other: &Point) -> Point {
+                let mut result = other.gen_zero();
+                let mut adding = other.clone();
+                while self != 0 {
+                    if (self.clone() & 1) == 1 {
+                        result = result.clone() + adding.clone();
+                    }
+                    adding = adding.clone() + adding;
+                    self >>= 1;
+                }
+                result
+            }
+        }
+        impl Mul<&Point> for &$t {
+            type Output = Point;
+            #[allow(clippy::suspicious_arithmetic_impl)]
+            #[inline(always)]
+            fn mul(self, other: &Point) -> Point {
                 let mut s = self.clone();
                 let mut result = other.gen_zero();
                 let mut adding = other.clone();
