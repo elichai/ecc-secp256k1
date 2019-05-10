@@ -134,14 +134,21 @@ impl PublicKey {
     }
 
     #[allow(non_snake_case)]
-    pub fn verify_schnorr(&self, msg: &[u8], sig: Signature) -> bool {
-        let G = get_context().generator();
+    pub fn verify_schnorr(&self, msg: &[u8], sig: SchnorrSignature) -> bool {
         let order = &get_context().order;
-        let r = FieldElement::from_serialize(&sig.r.0, order);
-        let s = FieldElement::from_serialize(&sig.s.0, order);
+        let r = FieldElement::from_serialize(&sig.0.r.0, order);
+        let s = FieldElement::from_serialize(&sig.0.s.0, order);
         let m = msg.hash_digest();
 
-        let mut e = get_e(r.clone(), self.clone(), m);
+        let e = get_e(r.clone(), self.clone(), m);
+
+        self.verify_schnorr_raw(e, r, s)
+    }
+
+    #[allow(non_snake_case)]
+    pub(crate) fn verify_schnorr_raw(&self, mut e: FieldElement, r: FieldElement, s: FieldElement) -> bool {
+        let G = get_context().generator();
+
         e.reflect();
         let R = (s.num * G) + e.num * &self.point;
         if R.is_on_infinity() {
@@ -175,13 +182,12 @@ impl PrivateKey {
         result
     }
 
-    pub(crate) fn sign_raw(d: &Integer, mut k: FieldElement, z: FieldElement) -> Signature {
+    pub(crate) fn sign_raw(d: &Integer, k: FieldElement, z: FieldElement) -> Signature {
         let secp = get_context();
-        let k_point: Point = k.num.clone() * secp.generator();
+        let k_point: Point = &k.num * secp.generator();
         let order = &secp.order;
         let mut r = k_point.x;
         r.modulo = order.clone();
-        k.modulo = order.clone();
         r.mod_num().round_mod();
         let mut s: FieldElement = (z + (r.clone() * d)) / k;
         if s.num > Integer::from(order / 2) {
@@ -199,13 +205,13 @@ impl PrivateKey {
         let secp = get_context();
         let k: [u8; 32] = OsRng::new().unwrap().gen();
         let msg_hash = msg.hash_digest();
-        let k = FieldElement::from_serialize(&k, &secp.modulo);
+        let k = FieldElement::from_serialize(&k, &secp.order);
         let z = FieldElement::from_serialize(&msg_hash, &secp.order);
         Self::sign_raw(&self.scalar, k, z)
     }
 
     #[allow(non_snake_case)]
-    pub fn sign_schnorr(&self, msg: &[u8]) -> Signature {
+    pub fn sign_schnorr(&self, msg: &[u8]) -> SchnorrSignature {
         let secp = get_context();
         let m = msg.hash_digest();
         // Deterministic k, could be random.
@@ -221,10 +227,17 @@ impl PrivateKey {
         }
         let R = &k.num * secp.generator();
         let e = get_e(R.x.clone(), self.generate_pubkey(),  m);
-        let s = k + e * &self.scalar;
+        Self::sign_schnorr_raw(&self.scalar, k, e, Some(R))
+    }
+
+    #[allow(non_snake_case)]
+    pub(crate) fn sign_schnorr_raw(d: &Integer, k: FieldElement, e: FieldElement, R: Option<Point>) -> SchnorrSignature {
+        let R = R.unwrap_or_else(|| &k.num * get_context().generator());
+
+        let s = k + e * d;
         let s = s.serialize_num();
         let r = R.x.serialize_num();
-        Signature::new(&r, &s)
+        SchnorrSignature::new(&r, &s)
     }
 
     fn serialize(&self) -> Vec<u8> {
@@ -251,6 +264,24 @@ fn get_e(xR: FieldElement, pubkey: PublicKey, msg: [u8; 32]) -> FieldElement {
 pub struct Signature {
     r: Scalar,
     s: Scalar,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct SchnorrSignature(pub(crate) Signature);
+
+impl SchnorrSignature {
+    pub(crate) fn new(r: &[u8], s: &[u8]) -> SchnorrSignature {
+        SchnorrSignature(Signature::new(r, s))
+    }
+
+    pub fn serialize(&self) -> [u8; 64] {
+        self.0.serialize()
+    }
+
+    pub fn parse(sig: [u8; 64]) -> SchnorrSignature {
+        SchnorrSignature(Signature::parse(sig))
+    }
+
 }
 
 impl Signature {
