@@ -212,22 +212,30 @@ impl PrivateKey {
 
     #[allow(non_snake_case)]
     pub fn sign_schnorr(&self, msg: &[u8]) -> SchnorrSignature {
-        let secp = get_context();
+        let G = &get_context().generator;
         let m = msg.hash_digest();
         // Deterministic k, could be random.
+        let k = self.deterministic_k_schnorr(m);
+        let R = &k.num * G;
+        let e = get_e(R.x.clone(), self.generate_pubkey(),  m);
+
+        Self::sign_schnorr_raw(&self.scalar, k, e, Some(R))
+    }
+
+    fn deterministic_k_schnorr(&self, m: [u8; 32]) -> FieldElement {
+        let order = &get_context().order;
+        let d = self.serialize();
         let mut k = HashDigest::new();
-        k.input(&self.serialize());
+        k.input(&d);
         k.input(&m);
         let k = k.result();
-        let mut k = FieldElement::from_serialize(&k, &secp.order);
+        let mut k = FieldElement::from_serialize(&k, order);
         k.mod_num();
         // TODO: Check the Jacobi symbol and if not 1 subtract by the group order (https://en.wikipedia.org/wiki/Jacobi_symbol)
         if k.is_zero() {
             unimplemented!();
         }
-        let R = &k.num * secp.generator();
-        let e = get_e(R.x.clone(), self.generate_pubkey(),  m);
-        Self::sign_schnorr_raw(&self.scalar, k, e, Some(R))
+        k
     }
 
     #[allow(non_snake_case)]

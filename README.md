@@ -17,5 +17,6 @@ It provides both low level API (Mul/Add/Div etc.), and Private/Public Keys inter
 - [ ] Remove the usage of GMP library.
 - [ ] Look into implementing sha2 myself.
 - [ ] Remove all `unimplemented!()` and add checks for the points all over.
-- [ ] Add Schnorr support.
+- [x] Add BIP Schnorr support. (Finished except taking and verifying Quadric Residue)
+- [ ] Implement MuSig
 - [ ] Bulletproofs?

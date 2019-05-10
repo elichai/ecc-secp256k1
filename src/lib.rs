@@ -7,7 +7,7 @@ mod u256;
 
 mod test_rust_secp256k1;
 
-pub use crate::secp256k1::{PrivateKey, PublicKey, Signature};
+pub use crate::secp256k1::{PrivateKey, PublicKey, Signature, SchnorrSignature};
 
 #[cfg(test)]
 mod tests {
