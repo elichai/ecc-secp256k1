@@ -1,8 +1,10 @@
 use crate::field::FieldElement;
 use crate::hash::{HashDigest, HashTrait};
+use crate::jacobi;
+use crate::jacobi::Jacobi;
 use crate::point::{Group, Point};
-use rand_os::OsRng;
 use rand_os::rand_core::RngCore;
+use rand_os::OsRng;
 use rug::{integer::Order, Integer};
 use std::{
     fmt,
@@ -10,8 +12,6 @@ use std::{
     ops::Deref,
     sync::Once,
 };
-use crate::jacobi;
-use crate::jacobi::Jacobi;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Secp256k1 {
@@ -63,7 +63,7 @@ impl Secp256k1 {
 }
 
 pub struct PrivateKey {
-    scalar: Integer
+    scalar: Integer,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -99,7 +99,7 @@ impl PublicKey {
         if !point.is_on_curve() {
             unimplemented!();
         }
-        PublicKey { point, }
+        PublicKey { point }
     }
 
     pub fn from_compressed(ser: &[u8]) -> Result<PublicKey, &'static str> {
@@ -169,7 +169,6 @@ impl PublicKey {
         }
         R.x.num == r.num
     }
-
 }
 
 impl PrivateKey {
@@ -272,8 +271,14 @@ impl PrivateKey {
         SchnorrSignature::new(&r, &s)
     }
 
-    fn serialize(&self) -> Vec<u8> {
-        self.scalar.to_digits(Order::MsfLe)
+    fn serialize(&self) -> [u8; 32] {
+        let mut res = [0u8; 32];
+        let serialized = self.scalar.to_digits(Order::MsfLe);
+        if serialized.len() > 32 {
+            unimplemented!();
+        }
+        res[32 - serialized.len()..].copy_from_slice(&serialized);
+        res
     }
 
     pub fn from_serialized(ser: &[u8]) -> PrivateKey {
@@ -313,7 +318,6 @@ impl SchnorrSignature {
     pub fn parse(sig: [u8; 64]) -> SchnorrSignature {
         SchnorrSignature(Signature::parse(sig))
     }
-
 }
 
 impl Signature {
@@ -428,19 +432,15 @@ impl Scalar {
     }
 }
 
-
-
 static mut CONTEXT: Option<Secp256k1> = None;
-
 
 pub fn get_context() -> &'static Secp256k1 {
     static INIT_CONTEXT: Once = Once::new();
-    INIT_CONTEXT.call_once(|| {
-        unsafe { CONTEXT = Some(Default::default()); }
+    INIT_CONTEXT.call_once(|| unsafe {
+        CONTEXT = Some(Default::default());
     });
     unsafe { CONTEXT.as_ref().unwrap() }
 }
-
 
 impl fmt::Display for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -484,7 +484,7 @@ impl AsRef<[u8]> for Scalar {
 mod test {
 
     use super::*;
-    use crate::test_vectors::{SCHNORR_VECTORS, TestMode, TestVector};
+    use crate::test_vectors::{TestMode, TestVector, SCHNORR_VECTORS};
 
     #[test]
     fn test_compress_pubkey() {
@@ -545,63 +545,45 @@ mod test {
 
     #[test]
     fn test_schnorr_vectors() {
-        fn verify_only(test: &TestVector) -> bool {
+        fn verify_only(test: &TestVector) {
             let pubkey = match PublicKey::from_compressed(&test.pk) {
                 Ok(k) => k,
-                Err(e) => return false,
+                Err(_) => {
+                    assert_eq!(test.verify_result, false);
+                    return;
+                }
             };
             let msg = test.msg;
             let sig = SchnorrSignature::parse(test.sig);
-            raw_message_verify(&pubkey, msg, &sig)
+            assert_eq!(test.verify_result, pubkey.verify_schnorr_internal(msg, sig));
         }
-        fn sign_and_verify(test: &TestVector) -> bool {
-            let G = &get_context().generator;
+        fn sign_and_verify(test: &TestVector) {
             let privkey = PrivateKey::from_serialized(&test.sk);
             let m = test.msg;
-            let sig = raw_message_sign(&privkey, m);
+            let sig = privkey.sign_schnorr_internal(m);
 
             let pubkey = match PublicKey::from_compressed(&test.pk) {
                 Ok(k) => k,
-                Err(e) => return false,
+                Err(_) => {
+                    assert_eq!(test.verify_result, false);
+                    return;
+                }
             };
             let othersig = SchnorrSignature::parse(test.sig);
 
-            raw_message_verify(&pubkey, m, &othersig) && raw_message_verify(&pubkey, m, &sig)
+            assert_eq!(sig, othersig);
+            assert_eq!(test.verify_result, pubkey.verify_schnorr_internal(m, othersig));
         }
-        fn parse_pubkey_only(test: &TestVector) -> bool {
-            PublicKey::from_compressed(&test.pk).is_ok()
+        fn parse_pubkey_only(test: &TestVector) {
+            assert_eq!(test.verify_result, PublicKey::from_compressed(&test.pk).is_ok());
         }
 
         for vec in &SCHNORR_VECTORS {
-            let res = match vec.mode {
+            match vec.mode {
                 TestMode::All => sign_and_verify(vec),
                 TestMode::VerifyOnly => verify_only(vec),
                 TestMode::ParsePubkeyOnly => parse_pubkey_only(vec),
             };
-            println!("{}", res);
         }
-
     }
-
-    fn raw_message_sign(key: &PrivateKey, msg: [u8;32]) -> SchnorrSignature {
-        let G = &get_context().generator;
-        // Deterministic k, could be random.
-        let k = key.deterministic_k_schnorr(msg);
-        let R = &k.num * G;
-        let e = get_e(R.x.clone(), key.generate_pubkey(),  msg);
-
-        PrivateKey::sign_schnorr_raw(&key.scalar, k, e, Some(R))
-    }
-
-
-    fn raw_message_verify(key: &PublicKey, msg: [u8;32], sig: &SchnorrSignature) -> bool {
-        let order = &get_context().order;
-        let sig = sig.serialize();
-        let r = FieldElement::from_serialize(&sig[..32], order);
-        let s = FieldElement::from_serialize(&sig[32..], order);
-        let e = get_e(r.clone(), key.clone(), msg);
-        key.verify_schnorr_raw(e, r, s)
-    }
-
-
 }

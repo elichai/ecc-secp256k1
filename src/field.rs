@@ -79,8 +79,14 @@ impl FieldElement {
         self.mod_num().round_mod();
     }
 
-    pub fn serialize_num(self) -> Vec<u8> {
-        self.num.to_digits(Self::ORDER)
+    pub fn serialize_num(self) -> [u8; 32] {
+        let mut res = [0u8; 32];
+        let serialized = self.num.to_digits(Self::ORDER);
+        if serialized.len() > 32 {
+            unimplemented!();
+        }
+        res[32 - serialized.len()..].copy_from_slice(&serialized);
+        res
     }
 
     pub fn from_serialize<I: Into<Integer>>(ser: &[u8], modulo: I) -> FieldElement {

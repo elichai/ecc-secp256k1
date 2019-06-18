@@ -1,16 +1,17 @@
 mod field;
 mod hash;
 pub mod internal;
+mod jacobi;
 mod point;
 mod secp256k1;
-mod u256;
-mod jacobi;
+//mod u256;
 
-#[cfg(test)] mod test_vectors;
+#[cfg(test)]
+mod test_vectors;
 
 mod test_rust_secp256k1;
 
-pub use crate::secp256k1::{PrivateKey, PublicKey, Signature, SchnorrSignature};
+pub use crate::secp256k1::{PrivateKey, PublicKey, SchnorrSignature, Signature};
 
 #[cfg(test)]
 mod tests {

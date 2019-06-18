@@ -7,14 +7,13 @@ pub enum TestMode {
     ParsePubkeyOnly,
 }
 
-
 pub struct TestVector {
     pub sk: [u8; 32],
     pub pk: [u8; 33],
     pub msg: [u8; 32],
     pub sig: [u8; 64],
     pub mode: TestMode,
-    pub result: bool,
+    pub verify_result: bool,
 }
 
 pub const SCHNORR_VECTORS: [TestVector; 16] = [
@@ -50,7 +49,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
             0x77, 0xF7, 0xF2, 0x2C, 0xC1, 0xDC, 0xED, 0x05
         ],
         mode: TestMode::All,
-        result: true,
+        verify_result: true,
     },
     TestVector {
         /* Test vector 2 */
@@ -84,8 +83,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
             0xA1, 0xA6, 0x4D, 0xC5, 0x9F, 0x70, 0x13, 0xFD
         ],
         mode: TestMode::All,
-        result: true,
-
+        verify_result: true,
     },
     TestVector {
         /* Test vector 3 */
@@ -119,8 +117,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
             0x77, 0x3A, 0x05, 0xF0, 0xDE, 0x14, 0x23, 0x80
         ],
         mode: TestMode::All,
-        result: true,
-
+        verify_result: true,
     },
     TestVector {
         /* Test vector 4 */
@@ -149,8 +146,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
         ],
         mode: TestMode::VerifyOnly,
         sk: [0u8; 32],
-        result: true,
-
+        verify_result: true,
     },
     TestVector {
         /* Test vector 5 */
@@ -179,9 +175,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
         ],
         mode: TestMode::VerifyOnly,
         sk: [0u8; 32],
-        result: true,
-
-
+        verify_result: true,
     },
     TestVector {
         /* Test vector 6 */
@@ -210,9 +204,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
         ],
         mode: TestMode::VerifyOnly,
         sk: [0u8; 32],
-        result: true,
-
-
+        verify_result: true,
     },
     TestVector {
         /* Test vector 7 */
@@ -227,7 +219,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
         sk: [0u8; 32],
         msg: [0u8; 32],
         sig: [0u8; 64],
-        result: false,
+        verify_result: false,
     },
     TestVector {
         /* Test vector 8 */
@@ -256,7 +248,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
         ],
         mode: TestMode::VerifyOnly,
         sk: [0u8; 32],
-        result: false,
+        verify_result: false,
     },
     TestVector {
         /* Test vector 9 */
@@ -285,8 +277,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
         ],
         mode: TestMode::VerifyOnly,
         sk: [0u8; 32],
-        result: false,
-
+        verify_result: false,
     },
     TestVector {
         /* Test vector 10 */
@@ -315,8 +306,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
         ],
         mode: TestMode::VerifyOnly,
         sk: [0u8; 32],
-        result: false,
-
+        verify_result: false,
     },
     TestVector {
         /* Test vector 11 */
@@ -345,8 +335,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
         ],
         mode: TestMode::VerifyOnly,
         sk: [0u8; 32],
-        result: false,
-
+        verify_result: false,
     },
     TestVector {
         /* Test vector 12 */
@@ -375,8 +364,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
         ],
         mode: TestMode::VerifyOnly,
         sk: [0u8; 32],
-        result: false,
-
+        verify_result: false,
     },
     TestVector {
         /* Test vector 13 */
@@ -405,8 +393,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
         ],
         mode: TestMode::VerifyOnly,
         sk: [0u8; 32],
-        result: false,
-
+        verify_result: false,
     },
     TestVector {
         /* Test vector 14 */
@@ -435,8 +422,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
         ],
         mode: TestMode::VerifyOnly,
         sk: [0u8; 32],
-        result: false,
-
+        verify_result: false,
     },
     TestVector {
         /* Test vector 15 */
@@ -465,8 +451,7 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
         ],
         mode: TestMode::VerifyOnly,
         sk: [0u8; 32],
-        result: false,
-
+        verify_result: false,
     },
     TestVector {
         /* Test vector 16 */
@@ -495,11 +480,9 @@ pub const SCHNORR_VECTORS: [TestVector; 16] = [
         ],
         mode: TestMode::VerifyOnly,
         sk: [0u8; 32],
-        result: false,
-
+        verify_result: false,
     },
 ];
-
 
 impl fmt::Debug for TestVector {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -509,6 +492,7 @@ impl fmt::Debug for TestVector {
         debug_trait_builder.field("msg", &(self.msg));
         debug_trait_builder.field("sig", &(&self.sig[..]));
         debug_trait_builder.field("mode", &(self.mode));
+        debug_trait_builder.field("verify_result", &(self.verify_result));
         debug_trait_builder.finish()
     }
 }

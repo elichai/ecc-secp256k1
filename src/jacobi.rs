@@ -1,8 +1,7 @@
 use rug::Integer;
 use std::mem;
 
-
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum Jacobi {
     Zero,
     One,
@@ -18,7 +17,6 @@ impl Jacobi {
     }
 }
 
-
 impl From<Jacobi> for i8 {
     fn from(sym: Jacobi) -> i8 {
         match sym {
@@ -29,12 +27,13 @@ impl From<Jacobi> for i8 {
     }
 }
 
-pub fn jacobi_symbol(mut numerator: Integer, mut denominator: Integer) ->  Jacobi {
+pub fn jacobi_symbol(mut numerator: Integer, mut denominator: Integer) -> Jacobi {
     debug_assert!(!denominator.is_even());
     debug_assert_ne!(denominator, 0);
     let mut res = Jacobi::One;
     while numerator != 0 {
-        while numerator.is_even() { // As long as it's even we can use the second supplementary law (2/p) and check the symbol.
+        while numerator.is_even() {
+            // As long as it's even we can use the second supplementary law (2/p) and check the symbol.
             numerator /= 2;
             let tmp = denominator.mod_u(8);
             if tmp == 3 || tmp == 5 {
@@ -58,10 +57,8 @@ pub fn jacobi_symbol(mut numerator: Integer, mut denominator: Integer) ->  Jacob
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use rug::Integer;
     use super::*;
     use rug::{integer::Order, Integer};
 
