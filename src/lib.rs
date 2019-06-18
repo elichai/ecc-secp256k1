@@ -6,6 +6,7 @@ mod secp256k1;
 mod u256;
 mod jacobi;
 
+#[cfg(test)] mod test_vectors;
 
 mod test_rust_secp256k1;
 

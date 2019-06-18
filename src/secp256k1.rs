@@ -471,6 +471,7 @@ impl AsRef<[u8]> for Scalar {
 mod test {
 
     use super::*;
+    use crate::test_vectors::{SCHNORR_VECTORS, TestMode, TestVector};
 
     #[test]
     fn test_compress_pubkey() {
@@ -528,4 +529,66 @@ mod test {
         let sig = priv_key.sign_schnorr(msg);
         assert!(pub_key.verify_schnorr(msg, sig));
     }
+
+    #[test]
+    fn test_schnorr_vectors() {
+        fn verify_only(test: &TestVector) -> bool {
+            let pubkey = match PublicKey::from_compressed(&test.pk) {
+                Ok(k) => k,
+                Err(e) => return false,
+            };
+            let msg = test.msg;
+            let sig = SchnorrSignature::parse(test.sig);
+            raw_message_verify(&pubkey, msg, &sig)
+        }
+        fn sign_and_verify(test: &TestVector) -> bool {
+            let G = &get_context().generator;
+            let privkey = PrivateKey::from_serialized(&test.sk);
+            let m = test.msg;
+            let sig = raw_message_sign(&privkey, m);
+
+            let pubkey = match PublicKey::from_compressed(&test.pk) {
+                Ok(k) => k,
+                Err(e) => return false,
+            };
+            let othersig = SchnorrSignature::parse(test.sig);
+
+            dbg!(raw_message_verify(&pubkey, m, &othersig)) && dbg!(raw_message_verify(&pubkey, m, &sig))
+        }
+        fn parse_pubkey_only(test: &TestVector) -> bool {
+            PublicKey::from_compressed(&test.pk).is_ok()
+        }
+
+        for vec in &SCHNORR_VECTORS {
+            let res = match vec.mode {
+                TestMode::All => sign_and_verify(vec),
+                TestMode::VerifyOnly => verify_only(vec),
+                TestMode::ParsePubkeyOnly => parse_pubkey_only(vec),
+            };
+            println!("{}", res);
+        }
+
+    }
+
+    fn raw_message_sign(key: &PrivateKey, msg: [u8;32]) -> SchnorrSignature {
+        let G = &get_context().generator;
+        // Deterministic k, could be random.
+        let k = key.deterministic_k_schnorr(msg);
+        let R = &k.num * G;
+        let e = get_e(R.x.clone(), key.generate_pubkey(),  msg);
+
+        PrivateKey::sign_schnorr_raw(&key.scalar, k, e, Some(R))
+    }
+
+
+    fn raw_message_verify(key: &PublicKey, msg: [u8;32], sig: &SchnorrSignature) -> bool {
+        let order = &get_context().order;
+        let sig = sig.serialize();
+        let r = FieldElement::from_serialize(&sig[..32], order);
+        let s = FieldElement::from_serialize(&sig[32..], order);
+        let e = get_e(r.clone(), key.clone(), msg);
+        key.verify_schnorr_raw(e, r, s)
+    }
+
+
 }
