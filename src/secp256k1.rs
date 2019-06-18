@@ -129,9 +129,9 @@ impl PublicKey {
         point.x.num == r.num // Sometimes r.num is only 31 bytes. need to take a closer look.
     }
 
-    pub fn verify(&self, msg: &[u8], sig: Signature) -> bool {
+    pub fn verify(&self, msg: &[u8], sig: Signature, to_hash: bool) -> bool {
         let order = &get_context().order;
-        let msg_hash = msg.hash_digest();
+        let msg_hash = get_hashed_message_if(msg, to_hash);
         let z = FieldElement::from_serialize(&msg_hash, order);
         let r = FieldElement::from_serialize(&sig.r.0, order);
         let s = FieldElement::from_serialize(&sig.s.0, order);
@@ -139,11 +139,8 @@ impl PublicKey {
     }
 
     #[allow(non_snake_case)]
-    pub fn verify_schnorr(&self, msg: &[u8], sig: SchnorrSignature) -> bool {
-        let m = msg.hash_digest();
-        self.verify_schnorr_internal(m, sig)
-    }
-    fn verify_schnorr_internal(&self, m: [u8; 32], sig: SchnorrSignature) -> bool {
+    pub fn verify_schnorr(&self, msg: &[u8], sig: SchnorrSignature, to_hash: bool) -> bool {
+        let m = get_hashed_message_if(msg, to_hash);
         let order = &get_context().order;
         let r = FieldElement::from_serialize(&sig.0.r.0, order);
         let s = FieldElement::from_serialize(&sig.0.s.0, order);
@@ -212,24 +209,20 @@ impl PrivateKey {
     }
 
     // TODO: Recovery ID
-    pub fn sign(&self, msg: &[u8]) -> Signature {
+    pub fn sign(&self, msg: &[u8], to_hash: bool) -> Signature {
         let secp = get_context();
         let mut k = [0u8; 32];
         OsRng::default().fill_bytes(&mut k);
-        let msg_hash = msg.hash_digest();
+        let msg_hash = get_hashed_message_if(msg, to_hash);
+
         let k = FieldElement::from_serialize(&k, &secp.order);
         let z = FieldElement::from_serialize(&msg_hash, &secp.order);
         Self::sign_raw(&self.scalar, k, z)
     }
 
     #[allow(non_snake_case)]
-    pub fn sign_schnorr(&self, msg: &[u8]) -> SchnorrSignature {
-        let m = msg.hash_digest();
-        self.sign_schnorr_internal(m)
-    }
-
-    #[allow(non_snake_case)]
-    fn sign_schnorr_internal(&self, m: [u8; 32]) -> SchnorrSignature {
+    pub fn sign_schnorr(&self, msg: &[u8], to_hash: bool) -> SchnorrSignature {
+        let m = get_hashed_message_if(msg, to_hash);
         let G = &get_context().generator;
         let order = &get_context().order;
         let p = &get_context().modulo;
@@ -295,6 +288,20 @@ fn get_e(xR: FieldElement, pubkey: PublicKey, msg: [u8; 32]) -> FieldElement {
     e.input(&pubkey.compressed());
     e.input(&msg);
     FieldElement::from_serialize(&e.result(), &secp.order)
+}
+
+
+fn get_hashed_message_if(msg: &[u8], to_hash: bool) -> [u8; 32] {
+    let mut msg_hash = [0u8; 32];
+    if to_hash {
+        msg_hash = msg.hash_digest();
+    } else if msg.len() != 32 {
+        unimplemented!();
+    } else {
+        msg_hash.copy_from_slice(msg);
+    }
+    msg_hash
+
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -520,15 +527,15 @@ mod test {
         let pub_key = priv_key.generate_pubkey();
 
         let msg = b"Liberta!";
-        let sig = priv_key.sign(msg);
-        assert!(pub_key.verify(msg, sig));
+        let sig = priv_key.sign(msg, true);
+        assert!(pub_key.verify(msg, sig, true));
     }
 
     #[test]
     fn test_sign_der() {
         let priv_key = PrivateKey::new(8764321234_u128);
         let msg = b"Liberta!";
-        let sig = priv_key.sign(msg);
+        let sig = priv_key.sign(msg, true);
         let der = sig.serialize_der();
         assert_eq!(sig, Signature::parse_der(&der));
     }
@@ -539,8 +546,8 @@ mod test {
         let pub_key = priv_key.generate_pubkey();
 
         let msg = b"HODL!";
-        let sig = priv_key.sign_schnorr(msg);
-        assert!(pub_key.verify_schnorr(msg, sig));
+        let sig = priv_key.sign_schnorr(msg, true);
+        assert!(pub_key.verify_schnorr(msg, sig, true));
     }
 
     #[test]
@@ -555,12 +562,12 @@ mod test {
             };
             let msg = test.msg;
             let sig = SchnorrSignature::parse(test.sig);
-            assert_eq!(test.verify_result, pubkey.verify_schnorr_internal(msg, sig));
+            assert_eq!(test.verify_result, pubkey.verify_schnorr(&msg, sig, false));
         }
         fn sign_and_verify(test: &TestVector) {
             let privkey = PrivateKey::from_serialized(&test.sk);
             let m = test.msg;
-            let sig = privkey.sign_schnorr_internal(m);
+            let sig = privkey.sign_schnorr(&m, false);
 
             let pubkey = match PublicKey::from_compressed(&test.pk) {
                 Ok(k) => k,
@@ -572,7 +579,7 @@ mod test {
             let othersig = SchnorrSignature::parse(test.sig);
 
             assert_eq!(sig, othersig);
-            assert_eq!(test.verify_result, pubkey.verify_schnorr_internal(m, othersig));
+            assert_eq!(test.verify_result, pubkey.verify_schnorr(&m, othersig, false));
         }
         fn parse_pubkey_only(test: &TestVector) {
             assert_eq!(test.verify_result, PublicKey::from_compressed(&test.pk).is_ok());

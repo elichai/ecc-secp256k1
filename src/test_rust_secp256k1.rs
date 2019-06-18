@@ -18,7 +18,7 @@ fn test_cmp_sign_der() {
     let priv_key = PrivateKey::from_serialized(&key);
     let msg = get_rand_msg();
 
-    let orig_sig = priv_key.sign(&msg);
+    let orig_sig = priv_key.sign(&msg, true);
     let pubkey = priv_key.generate_pubkey().compressed();
 
     // Verify with rust-secp256k1
@@ -40,7 +40,7 @@ fn test_cmp_sign_compact() {
     let priv_key = PrivateKey::from_serialized(&key);
     let msg = get_rand_msg();
 
-    let orig_sig = priv_key.sign(&msg).serialize();
+    let orig_sig = priv_key.sign(&msg, true).serialize();
     let pubkey = priv_key.generate_pubkey().compressed();
 
     // Verify with rust-secp256k1
@@ -76,7 +76,7 @@ fn test_cmp_verify_compact_uncompressed() {
 
     let sig = Signature::parse(sig);
     let pubkey = PublicKey::from_uncompressed(&pubkey);
-    assert!(pubkey.verify(&orig_msg, sig));
+    assert!(pubkey.verify(&orig_msg, sig, true));
 }
 
 #[test]
@@ -93,5 +93,5 @@ fn test_cmp_verify_der_compressed() {
 
     let sig = Signature::parse_der(&sig.serialize_der());
     let pubkey = PublicKey::from_compressed(&pubkey).unwrap();
-    assert!(pubkey.verify(&orig_msg, sig));
+    assert!(pubkey.verify(&orig_msg, sig, true));
 }
