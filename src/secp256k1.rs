@@ -140,10 +140,13 @@ impl PublicKey {
 
     #[allow(non_snake_case)]
     pub fn verify_schnorr(&self, msg: &[u8], sig: SchnorrSignature) -> bool {
+        let m = msg.hash_digest();
+        self.verify_schnorr_internal(m, sig)
+    }
+    fn verify_schnorr_internal(&self, m: [u8; 32], sig: SchnorrSignature) -> bool {
         let order = &get_context().order;
         let r = FieldElement::from_serialize(&sig.0.r.0, order);
         let s = FieldElement::from_serialize(&sig.0.s.0, order);
-        let m = msg.hash_digest();
 
         let e = get_e(r.clone(), self.clone(), m);
 
@@ -153,7 +156,7 @@ impl PublicKey {
     #[allow(non_snake_case)]
     pub(crate) fn verify_schnorr_raw(&self, mut e: FieldElement, r: FieldElement, s: FieldElement) -> bool {
         let G = get_context().generator();
-        let order = &get_context().order;
+        let p = &get_context().modulo;
 
         e.reflect();
         let R = (s.num * G) + e.num * &self.point;
@@ -161,9 +164,9 @@ impl PublicKey {
             return false;
         }
 
-       if jacobi::jacobi_symbol(R.y.num, order.clone()) != Jacobi::One {
-           return false;
-       }
+        if jacobi::jacobi_symbol(R.y.num, p.clone()) != Jacobi::One {
+            return false;
+        }
         R.x.num == r.num
     }
 
@@ -222,16 +225,22 @@ impl PrivateKey {
 
     #[allow(non_snake_case)]
     pub fn sign_schnorr(&self, msg: &[u8]) -> SchnorrSignature {
+        let m = msg.hash_digest();
+        self.sign_schnorr_internal(m)
+    }
+
+    #[allow(non_snake_case)]
+    fn sign_schnorr_internal(&self, m: [u8; 32]) -> SchnorrSignature {
         let G = &get_context().generator;
         let order = &get_context().order;
-        let m = msg.hash_digest();
+        let p = &get_context().modulo;
         // Deterministic k, could be random.
         let mut k = self.deterministic_k_schnorr(m);
         let R = &k.num * G;
-        if jacobi::jacobi_symbol(R.y.num.clone(), order.clone()) != Jacobi::One {
-            k.reflect();
+        if jacobi::jacobi_symbol(R.y.num.clone(), p.clone()) != Jacobi::One {
+            k = order - k;
         }
-        let e = get_e(R.x.clone(), self.generate_pubkey(),  m);
+        let e = get_e(R.x.clone(), self.generate_pubkey(), m);
 
         Self::sign_schnorr_raw(&self.scalar, k, e, Some(R))
     }

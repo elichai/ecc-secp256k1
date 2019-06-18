@@ -36,7 +36,7 @@ pub fn jacobi_symbol(mut numerator: Integer, mut denominator: Integer) ->  Jacob
     while numerator != 0 {
         while numerator.is_even() { // As long as it's even we can use the second supplementary law (2/p) and check the symbol.
             numerator /= 2;
-            let tmp = numerator.mod_u(8);
+            let tmp = denominator.mod_u(8);
             if tmp == 3 || tmp == 5 {
                 res.flip();
             }
@@ -63,6 +63,7 @@ pub fn jacobi_symbol(mut numerator: Integer, mut denominator: Integer) ->  Jacob
 mod tests {
     use rug::Integer;
     use super::*;
+    use rug::{integer::Order, Integer};
 
     #[test]
     fn test_jacobi() {
@@ -73,5 +74,22 @@ mod tests {
 
         let other = a.jacobi(&b);
         assert_eq!(i8::from(jacobi) as i32, other);
+    }
+
+    #[test]
+    fn test_failed_jacobi() {
+        let a = [
+            63_u8, 57, 121, 191, 114, 174, 130, 2, 152, 61, 201, 137, 174, 199, 242, 255, 46, 217, 27, 221, 105, 206, 2, 252, 7, 0,
+            202, 16, 14, 89, 221, 243,
+        ];
+        let a = Integer::from_digits(&a, Order::MsfLe);
+        let b = [
+            255_u8, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+            255, 255, 255, 254, 255, 255, 252, 47,
+        ];
+        let b = Integer::from_digits(&b, Order::MsfLe);
+
+        let my_jacobi = jacobi_symbol(a.clone(), b.clone());
+        assert_eq!(i8::from(my_jacobi) as i32, a.jacobi(&b));
     }
 }
