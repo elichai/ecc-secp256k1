@@ -10,6 +10,8 @@ use std::{
     ops::Deref,
     sync::Once,
 };
+use crate::jacobi;
+use crate::jacobi::Jacobi;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Secp256k1 {
@@ -148,13 +150,17 @@ impl PublicKey {
     #[allow(non_snake_case)]
     pub(crate) fn verify_schnorr_raw(&self, mut e: FieldElement, r: FieldElement, s: FieldElement) -> bool {
         let G = get_context().generator();
+        let order = &get_context().order;
 
         e.reflect();
         let R = (s.num * G) + e.num * &self.point;
         if R.is_on_infinity() {
-            unimplemented!();
+            return false;
         }
-        // TODO: Check that the Jacobi symbol is 1 (https://en.wikipedia.org/wiki/Jacobi_symbol)
+
+       if jacobi::jacobi_symbol(R.y.num, order.clone()) != Jacobi::One {
+           return false;
+       }
         R.x.num == r.num
     }
 
@@ -213,10 +219,14 @@ impl PrivateKey {
     #[allow(non_snake_case)]
     pub fn sign_schnorr(&self, msg: &[u8]) -> SchnorrSignature {
         let G = &get_context().generator;
+        let order = &get_context().order;
         let m = msg.hash_digest();
         // Deterministic k, could be random.
-        let k = self.deterministic_k_schnorr(m);
+        let mut k = self.deterministic_k_schnorr(m);
         let R = &k.num * G;
+        if jacobi::jacobi_symbol(R.y.num.clone(), order.clone()) != Jacobi::One {
+            k.reflect();
+        }
         let e = get_e(R.x.clone(), self.generate_pubkey(),  m);
 
         Self::sign_schnorr_raw(&self.scalar, k, e, Some(R))
@@ -238,6 +248,7 @@ impl PrivateKey {
         k
     }
 
+    // TODO: Pass Rx instead of R.
     #[allow(non_snake_case)]
     pub(crate) fn sign_schnorr_raw(d: &Integer, k: FieldElement, e: FieldElement, R: Option<Point>) -> SchnorrSignature {
         let R = R.unwrap_or_else(|| &k.num * get_context().generator());
