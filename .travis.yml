@@ -11,8 +11,8 @@ script:
 before_script:
   - if [ ${TRAVIS_RUST_VERSION} == "stable" ]; then
     rustup component add clippy-preview rustfmt;
-    cargo clippy -- -D clippy::all;
-    cargo fmt --all -- --check;
+    cargo clippy -- -W clippy::all;
+    cargo fmt --all;
     fi
 
 notifications:
