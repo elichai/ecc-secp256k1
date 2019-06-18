@@ -102,18 +102,21 @@ impl PublicKey {
         PublicKey { point, }
     }
 
-    pub fn from_compressed(ser: &[u8]) -> PublicKey {
+    pub fn from_compressed(ser: &[u8]) -> Result<PublicKey, &'static str> {
         let secp = get_context();
         let x = FieldElement::from_serialize(&ser[1..33], &secp.modulo);
         let mut y = secp.generator.group.get_y(&x);
         let is_even = y.is_even();
         if (ser[0] == 0x02 && !is_even) || (ser[0] == 0x03 && is_even) {
-            y = secp.modulo.clone() - y;
+            y.reflect();
         } else if ser[0] != 0x02 && ser[0] != 0x03 {
-            unimplemented!()
+            return Err("A compressed public key should start with 0x02/0x03");
         }
         let point = Point { x, y, group: secp.generator.group.clone() };
-        PublicKey { point }
+        if !point.is_on_curve() {
+            return Err("The public key is not on the point"); // Could it even happen assuming I got the y?;
+        }
+        Ok(PublicKey { point })
     }
 
     // TODO: Maxwell's trick: https://github.com/bitcoin-core/secp256k1/blob/abe2d3e/src/ecdsa_impl.h#L238-L253
@@ -478,7 +481,7 @@ mod test {
         let privkey = PrivateKey::new(32432432);
         let pubkey = privkey.generate_pubkey();
         let compress = pubkey.clone().compressed();
-        assert_eq!(PublicKey::from_compressed(&compress), pubkey);
+        assert_eq!(PublicKey::from_compressed(&compress).unwrap(), pubkey);
     }
 
     #[test]
@@ -553,7 +556,7 @@ mod test {
             };
             let othersig = SchnorrSignature::parse(test.sig);
 
-            dbg!(raw_message_verify(&pubkey, m, &othersig)) && dbg!(raw_message_verify(&pubkey, m, &sig))
+            raw_message_verify(&pubkey, m, &othersig) && raw_message_verify(&pubkey, m, &sig)
         }
         fn parse_pubkey_only(test: &TestVector) -> bool {
             PublicKey::from_compressed(&test.pk).is_ok()

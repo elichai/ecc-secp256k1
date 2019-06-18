@@ -92,6 +92,6 @@ fn test_cmp_verify_der_compressed() {
     // Verify with This library
 
     let sig = Signature::parse_der(&sig.serialize_der());
-    let pubkey = PublicKey::from_compressed(&pubkey);
+    let pubkey = PublicKey::from_compressed(&pubkey).unwrap();
     assert!(pubkey.verify(&orig_msg, sig));
 }

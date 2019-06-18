@@ -16,7 +16,9 @@ impl fmt::Display for FieldElement {
 impl FieldElement {
     const ORDER: Order = Order::MsfLe;
     pub fn new<I: Into<Integer>, T: Into<Integer>>(num: I, modulo: T) -> FieldElement {
-        FieldElement { num: num.into(), modulo: modulo.into() }
+        let mut res = FieldElement { num: num.into(), modulo: modulo.into() };
+        res.mod_num();
+        res
     }
 
     pub fn infinity<I: Into<Integer>>(modulo: I) -> FieldElement {
@@ -74,8 +76,7 @@ impl FieldElement {
     #[inline(always)]
     pub fn reflect(&mut self) {
         self.num.neg_assign();
-        self.round_mod();
-        self.num = self.num.clone() % &self.modulo;
+        self.mod_num().round_mod();
     }
 
     pub fn serialize_num(self) -> Vec<u8> {
