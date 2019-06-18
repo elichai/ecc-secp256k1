@@ -1,8 +1,8 @@
 use crate::field::FieldElement;
 use crate::hash::{HashDigest, HashTrait};
 use crate::point::{Group, Point};
-use rand::rngs::OsRng;
-use rand::Rng;
+use rand_os::OsRng;
+use rand_os::rand_core::RngCore;
 use rug::{integer::Order, Integer};
 use std::{
     fmt,
@@ -212,7 +212,8 @@ impl PrivateKey {
     // TODO: Recovery ID
     pub fn sign(&self, msg: &[u8]) -> Signature {
         let secp = get_context();
-        let k: [u8; 32] = OsRng::new().unwrap().gen();
+        let mut k = [0u8; 32];
+        OsRng::default().fill_bytes(&mut k);
         let msg_hash = msg.hash_digest();
         let k = FieldElement::from_serialize(&k, &secp.order);
         let z = FieldElement::from_serialize(&msg_hash, &secp.order);
