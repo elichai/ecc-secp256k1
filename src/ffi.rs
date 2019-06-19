@@ -27,6 +27,9 @@ pub mod ecdsa {
     ///
     ///
     pub unsafe extern "C" fn ecc_secp256k1_ecdsa_sign(sig_out: *mut EcdsaSig, msg: *const c_uchar, privkey: *const c_uchar) -> c_int {
+        if sig_out.is_null() || msg.is_null() || privkey.is_null() {
+            return -1;
+        }
         let privkey = slice::from_raw_parts(privkey as *const u8, 32);
         let msg = slice::from_raw_parts(msg as *const u8, 32);
         let key = PrivateKey::from_serialized(privkey);
@@ -47,6 +50,9 @@ pub mod ecdsa {
     /// -1 - Some other problem.
     ///
     pub unsafe extern "C" fn secp256k1_ec_ecdsa_verify(sig: *const EcdsaSig, msg: *const c_uchar, pubkey: *const c_uchar, compressed: c_int) -> c_int {
+        if sig.is_null() || msg.is_null() || pubkey.is_null() {
+            return -1;
+        }
         let pubkey_res = if compressed == 1 {
             let key = slice::from_raw_parts(pubkey as *const u8, 33);
             PublicKey::from_compressed(key)
@@ -91,6 +97,9 @@ pub mod schnorr {
     ///
     ///
     pub unsafe extern "C" fn ecc_secp256k1_schnorr_sign(sig_out: *mut SchnorrSig, msg: *const c_uchar, privkey: *const c_uchar) -> c_int {
+        if sig_out.is_null() || msg.is_null() || privkey.is_null() {
+            return -1;
+        }
         let privkey = slice::from_raw_parts(privkey as *const u8, 32);
         let msg = slice::from_raw_parts(msg as *const u8, 32);
         let key = PrivateKey::from_serialized(privkey);
@@ -110,6 +119,9 @@ pub mod schnorr {
     /// -1 - Some other problem.
     ///
     pub unsafe extern "C" fn secp256k1_ec_schnorr_verify(sig: *const SchnorrSig, msg: *const c_uchar, pubkey: *const c_uchar, compressed: c_int) -> c_int {
+        if sig.is_null() || msg.is_null() || pubkey.is_null() {
+            return -1;
+        }
         let pubkey_res = if compressed == 1 {
             let key = slice::from_raw_parts(pubkey as *const u8, 33);
             PublicKey::from_compressed(key)
