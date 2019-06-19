@@ -5,6 +5,8 @@ mod jacobi;
 mod point;
 mod secp256k1;
 //mod u256;
+#[cfg(any(feature = "ffi", test))]
+mod ffi;
 
 #[cfg(test)]
 mod test_vectors;
@@ -12,6 +14,9 @@ mod test_vectors;
 mod test_rust_secp256k1;
 
 pub use crate::secp256k1::{PrivateKey, PublicKey, SchnorrSignature, Signature};
+
+#[cfg(feature = "ffi")]
+pub use crate::ffi::{ecdsa::*, schnorr::*, *};
 
 #[cfg(test)]
 mod tests {
