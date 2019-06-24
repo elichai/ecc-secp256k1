@@ -4,10 +4,10 @@ pub mod internal;
 mod jacobi;
 mod point;
 mod secp256k1;
+mod hmac_sha2;
 //mod u256;
 #[cfg(any(feature = "ffi", test))]
 mod ffi;
-
 #[cfg(test)]
 mod test_vectors;
 
