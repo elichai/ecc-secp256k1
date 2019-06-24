@@ -18,11 +18,12 @@ secp256k1 = { version = "0.12.2", features = ["rand" ] }
 #numext-fixed-uint = "0.1.4"
 rand = "0.6"
 
-[profile.release]
-lto = true
+# [profile.release]
+# lto = true
 
 [build-dependencies]
-cbindgen = "0.8"
+# cbindgen = "0.8" Replace back after https://github.com/eqrion/cbindgen/pull/363 Is merged.
+cbindgen = { version = "0.8", git = "https://github.com/elichai/cbindgen.git", branch = "features", default-features = false}
 
 [features]
 ffi = []
