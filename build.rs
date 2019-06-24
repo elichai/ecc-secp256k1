@@ -13,5 +13,4 @@ fn main() {
         .generate()
         .expect("Unable to generate bindings")
         .write_to_file(&output_file);
-
 }

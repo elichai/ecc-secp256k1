@@ -48,7 +48,6 @@ fn test_cmp_sign_compact() {
     let secp = TestSecp256k1::verification_only();
     let pubkey = TestPublicKey::from_slice(&pubkey).unwrap();
     let msg = TestMessage::from_slice(&msg.hash_digest()).unwrap();
-    println!("{:?}", msg);
     let sig = TestSignature::from_compact(&orig_sig).unwrap();
     assert_eq!(&sig.serialize_compact()[..], &orig_sig[..]);
     assert!(secp.verify(&msg, &sig, &pubkey).is_ok())

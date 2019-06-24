@@ -290,7 +290,6 @@ fn get_e(xR: FieldElement, pubkey: PublicKey, msg: [u8; 32]) -> FieldElement {
     FieldElement::from_serialize(&e.result(), &secp.order)
 }
 
-
 fn get_hashed_message_if(msg: &[u8], to_hash: bool) -> [u8; 32] {
     let mut msg_hash = [0u8; 32];
     if to_hash {
@@ -301,7 +300,6 @@ fn get_hashed_message_if(msg: &[u8], to_hash: bool) -> [u8; 32] {
         msg_hash.copy_from_slice(msg);
     }
     msg_hash
-
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -325,6 +323,10 @@ impl SchnorrSignature {
     pub fn parse(sig: [u8; 64]) -> SchnorrSignature {
         SchnorrSignature(Signature::parse(sig))
     }
+
+    pub fn parse_slice(sig: &[u8]) -> SchnorrSignature {
+        SchnorrSignature(Signature::parse_slice(sig))
+    }
 }
 
 impl Signature {
@@ -342,6 +344,13 @@ impl Signature {
     }
 
     pub fn parse(sig: [u8; 64]) -> Signature {
+        Signature { r: Scalar::new(&sig[..32]), s: Scalar::new(&sig[32..]) }
+    }
+
+    pub fn parse_slice(sig: &[u8]) -> Signature {
+        if sig.len() != 64 {
+            panic!("Wrong sig length");
+        }
         Signature { r: Scalar::new(&sig[..32]), s: Scalar::new(&sig[32..]) }
     }
 
