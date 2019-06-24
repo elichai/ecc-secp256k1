@@ -44,7 +44,7 @@ pub mod ecdsa {
     /// 0 - Signature is not valid.
     /// -1 - Some other problem.
     ///
-    pub unsafe extern "C" fn secp256k1_ec_ecdsa_verify(
+    pub unsafe extern "C" fn ecc_secp256k1_ecdsa_verify(
         sig: *const c_uchar,
         msg: *const c_uchar,
         pubkey: *const c_uchar,
@@ -125,7 +125,7 @@ pub mod schnorr {
     /// 0 - Signature is not valid.
     /// -1 - Some other problem.
     ///
-    pub unsafe extern "C" fn secp256k1_ec_schnorr_verify(
+    pub unsafe extern "C" fn ecc_secp256k1_schnorr_verify(
         sig: *const c_uchar,
         msg: *const c_uchar,
         pubkey: *const c_uchar,
