@@ -12,8 +12,9 @@ pub struct HmacSha256Drbg {
 }
 
 impl HmacSha256 {
-    const IPAD: [u8; 64] = [0x36; 64];
+    #[allow(dead_code)]
     const OPAD: [u8; 64] = [0x5C; 64];
+    const IPAD: [u8; 64] = [0x36; 64];
     const IPAD_XOR_OPAD: [u8; 64] = [0x36 ^ 0x5C; 64];
     const BLOCK_SIZE: usize = 64;
 

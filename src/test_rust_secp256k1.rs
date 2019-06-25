@@ -4,7 +4,7 @@ extern crate secp256k1 as test_secp256k1;
 
 use crate::hash::HashTrait;
 use crate::{PrivateKey, PublicKey, Signature};
-use rand::{thread_rng, Rng};
+use test_secp256k1::rand::{thread_rng, Rng};
 use test_secp256k1::{
     rand::thread_rng as TestRng, Message as TestMessage, PublicKey as TestPublicKey, Secp256k1 as TestSecp256k1,
     SecretKey as TestPrivateKey, Signature as TestSignature,
@@ -57,7 +57,7 @@ fn get_rand_msg() -> Vec<u8> {
     let mut rng = thread_rng();
     let msg_len: usize = rng.gen_range(1, 1024);
     let mut msg = vec![0u8; msg_len];
-    rng.fill(&mut msg[..]);
+    rng.fill_bytes(&mut msg[..]);
     msg
 }
 

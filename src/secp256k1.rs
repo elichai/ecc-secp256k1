@@ -4,8 +4,6 @@ use crate::hmac_sha2::{HmacSha256, HmacSha256Drbg};
 use crate::jacobi;
 use crate::jacobi::Jacobi;
 use crate::point::{Group, Point};
-use rand_os::rand_core::RngCore;
-use rand_os::OsRng;
 use rug::{integer::Order, Integer};
 use std::{
     fmt,
