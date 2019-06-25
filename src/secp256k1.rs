@@ -3,6 +3,7 @@ use crate::hash::{HashDigest, HashTrait};
 use crate::jacobi;
 use crate::jacobi::Jacobi;
 use crate::point::{Group, Point};
+use crate::hmac_sha2::{HmacSha256Drbg, HmacSha256};
 use rand_os::rand_core::RngCore;
 use rand_os::OsRng;
 use rug::{integer::Order, Integer};
@@ -59,6 +60,17 @@ impl Secp256k1 {
             unimplemented!();
         }
         PublicKey { point }
+    }
+
+    // TODO: Hard code this.
+    pub fn serialized_order(&self) -> [u8; 32] {
+        let mut res = [0u8; 32];
+        let serialized = self.order.to_digits(Order::MsfLe);
+        if serialized.len() > 32 {
+            unimplemented!();
+        }
+        res[32 - serialized.len()..].copy_from_slice(&serialized);
+        res
     }
 }
 
@@ -211,13 +223,30 @@ impl PrivateKey {
     // TODO: Recovery ID
     pub fn sign(&self, msg: &[u8], to_hash: bool) -> Signature {
         let secp = get_context();
-        let mut k = [0u8; 32];
-        OsRng::default().fill_bytes(&mut k);
         let msg_hash = get_hashed_message_if(msg, to_hash);
 
-        let k = FieldElement::from_serialize(&k, &secp.order);
+        let k = self.deterministic_k_ecdsa(msg_hash);
         let z = FieldElement::from_serialize(&msg_hash, &secp.order);
         Self::sign_raw(&self.scalar, k, z)
+    }
+
+    fn deterministic_k_ecdsa(&self, m: [u8; 32]) -> FieldElement {
+        let order = get_context().serialized_order();
+        let mut state = HmacSha256Drbg::new(&self.serialize(), Some(&m));
+        let mut nonce = [0u8; 32];
+        state.generate(&mut nonce);
+
+        while nonce >= order && nonce == [0u8; 32] {
+            let mut tmp = HmacSha256::new_exact(&state.k);
+            tmp.input(&state.v);
+            tmp.input(&[0]);
+            state.k = tmp.finalize();
+            state.v = HmacSha256::quick(&state.k, &state.v);
+
+            state.generate(&mut nonce);
+        }
+
+        FieldElement::from_serialize(&nonce, &get_context().order)
     }
 
     #[allow(non_snake_case)]

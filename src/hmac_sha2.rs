@@ -7,8 +7,8 @@ pub struct HmacSha256 {
 }
 
 pub struct HmacSha256Drbg {
-    k: [u8; 32],
-    v: [u8; 32],
+    pub(crate) k: [u8; 32],
+    pub(crate) v: [u8; 32],
 }
 
 
@@ -37,7 +37,7 @@ impl HmacSha256 {
     }
 
     pub fn new_exact(key: &[u8; 32]) -> Self {
-        Self::new(&key).unwrap()
+        Self::new(key).unwrap()
     }
 
     pub fn input(&mut self, text: &[u8]) {
@@ -52,7 +52,7 @@ impl HmacSha256 {
 
     #[inline]
     pub fn quick(key: &[u8; 32], data: &[u8]) -> [u8; 32] {
-        let mut res = Self::new_exact(key); // k.len() == 32 so can never fail.
+        let mut res = Self::new_exact(key);
         res.input(data);
         res.finalize()
     }
@@ -83,7 +83,7 @@ impl HmacSha256Drbg {
         }
         let k = hmac.finalize();
         let v = HmacSha256::quick(&k, &v);
-        
+
         Self {k, v}
     }
 
@@ -92,7 +92,8 @@ impl HmacSha256Drbg {
         for i in (0..=(len/32)).rev() {
             self.v = HmacSha256::quick(&self.k, &self.v);
             let amount = out.write(&self.v).unwrap();
-            if i > 0 && amount > 0 {
+            if i > 0 && amount != 32 {
+                println!("amout: {:?} max len: {}, i: {}", amount, len, i);
                 unimplemented!("Something wrong with random generator");
             } else if i==0 && amount > 0 {
                 debug_assert_eq!(amount, len%32);

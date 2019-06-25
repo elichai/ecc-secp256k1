@@ -94,3 +94,22 @@ fn test_cmp_verify_der_compressed() {
     let pubkey = PublicKey::from_compressed(&pubkey).unwrap();
     assert!(pubkey.verify(&orig_msg, sig, true));
 }
+
+
+#[ignore]
+#[test]
+fn test_compare_sigs() { // TODO: FIXME.
+    let secp = TestSecp256k1::new();
+    let orig_msg = get_rand_msg();
+
+    let test_msg = TestMessage::from_slice(&orig_msg.hash_digest()).unwrap();
+    let test_privkey = TestPrivateKey::new(&mut TestRng());
+    let test_sig = secp.sign(&test_msg, &test_privkey).serialize_compact();
+
+    let my_privkey = PrivateKey::from_serialized(&test_privkey[..]);
+    let my_sig = my_privkey.sign(&orig_msg, true).serialize();
+
+    assert_eq!(&my_sig[..], &test_sig[..]);
+
+
+}
