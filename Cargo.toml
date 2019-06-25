@@ -1,6 +1,6 @@
 [package]
 name = "ecc-secp256k1"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Elichai Turkel <elichai.turkel@gmail.com>"]
 edition = "2018"
 
@@ -22,7 +22,7 @@ rustc-hex = "2"
 
 [build-dependencies]
 # cbindgen = "0.8" Replace back after https://github.com/eqrion/cbindgen/pull/363 Is merged.
-cbindgen = { version = "0.8", git = "https://github.com/elichai/cbindgen.git", branch = "features", default-features = false}
+cbindgen = { version = "0.8", git = "https://github.com/elichai/cbindgen.git", branch = "features", default-features = false, optional = true }
 
 [features]
-ffi = []
+ffi = ["cbindgen"]

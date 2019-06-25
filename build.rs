@@ -1,9 +1,9 @@
-use cbindgen::{Builder, Language};
-use std::{env, path::PathBuf};
-
 fn main() {
     #[cfg(feature = "ffi")]
     {
+        use cbindgen::{Builder, Language};
+        use std::{env, path::PathBuf};
+
         let target = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         let package_name = env::var("CARGO_PKG_NAME").unwrap().replace("-", "_");
         let output_file = target.join(format!("{}.h", package_name));
