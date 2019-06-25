@@ -58,11 +58,11 @@ impl HmacSha256 {
 
 impl HmacSha256Drbg {
     pub fn new(seed: &[u8], seed2: Option<&[u8]>) -> Self {
-        let k_start = [0u8; 32];
-        let v_start = [1u8; 32];
+        let k = [0u8; 32];
+        let v = [1u8; 32];
 
-        let mut hmac = HmacSha256::new(&k_start);
-        hmac.input(&v_start);
+        let mut hmac = HmacSha256::new(&k);
+        hmac.input(&v);
         hmac.input(&[0]);
         hmac.input(seed);
         if let Some(seed2) = seed2 {
@@ -70,10 +70,10 @@ impl HmacSha256Drbg {
         }
         let k = hmac.finalize();
 
-        let v = HmacSha256::quick(&k, &v_start);
+        let v = HmacSha256::quick(&k, &v);
 
         let mut hmac = HmacSha256::new(&k);
-        hmac.input(&v_start);
+        hmac.input(&v);
         hmac.input(&[1]);
         hmac.input(seed);
         if let Some(seed2) = seed2 {

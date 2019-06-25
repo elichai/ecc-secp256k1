@@ -236,7 +236,7 @@ impl PrivateKey {
         let mut nonce = [0u8; 32];
         state.generate(&mut nonce);
 
-        while nonce >= order && nonce == [0u8; 32] {
+        while nonce >= order || nonce == [0u8; 32] {
             let mut tmp = HmacSha256::new(&state.k);
             tmp.input(&state.v);
             tmp.input(&[0]);
