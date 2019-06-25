@@ -1,7 +1,6 @@
 use cbindgen::{Builder, Language};
 use std::{env, path::PathBuf};
 
-
 fn main() {
     #[cfg(feature = "ffi")]
     {

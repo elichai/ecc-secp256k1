@@ -95,10 +95,10 @@ fn test_cmp_verify_der_compressed() {
     assert!(pubkey.verify(&orig_msg, sig, true));
 }
 
-
 #[ignore]
 #[test]
-fn test_compare_sigs() { // TODO: FIXME.
+fn test_compare_sigs() {
+    // TODO: FIXME.
     let secp = TestSecp256k1::new();
     let orig_msg = get_rand_msg();
 
@@ -110,6 +110,4 @@ fn test_compare_sigs() { // TODO: FIXME.
     let my_sig = my_privkey.sign(&orig_msg, true).serialize();
 
     assert_eq!(&my_sig[..], &test_sig[..]);
-
-
 }

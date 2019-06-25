@@ -1,9 +1,9 @@
 use crate::field::FieldElement;
 use crate::hash::{HashDigest, HashTrait};
+use crate::hmac_sha2::{HmacSha256, HmacSha256Drbg};
 use crate::jacobi;
 use crate::jacobi::Jacobi;
 use crate::point::{Group, Point};
-use crate::hmac_sha2::{HmacSha256Drbg, HmacSha256};
 use rand_os::rand_core::RngCore;
 use rand_os::OsRng;
 use rug::{integer::Order, Integer};
@@ -237,7 +237,7 @@ impl PrivateKey {
         state.generate(&mut nonce);
 
         while nonce >= order && nonce == [0u8; 32] {
-            let mut tmp = HmacSha256::new_exact(&state.k);
+            let mut tmp = HmacSha256::new(&state.k);
             tmp.input(&state.v);
             tmp.input(&[0]);
             state.k = tmp.finalize();

@@ -17,6 +17,7 @@ rand_os = "0.2.0"
 secp256k1 = { version = "0.12.2", features = ["rand" ] }
 #numext-fixed-uint = "0.1.4"
 rand = "0.6"
+rustc-hex = "2"
 
 # [profile.release]
 # lto = true
