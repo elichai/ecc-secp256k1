@@ -7,7 +7,7 @@ rust:
   - nightly
 script:
   - cargo build --verbose
-  - cargo build --verbose --features=ffi
+  - cargo build --verbose
   - cargo test --verbose
 
 before_script:
@@ -15,6 +15,8 @@ before_script:
     rustup component add clippy-preview rustfmt;
     cargo clippy -- -W clippy::all;
     cargo fmt --all;
+    cargo install cbindgen;
+    cbindgen | cmp ecc_secp256k1.h;
     fi
 
 notifications:
