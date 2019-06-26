@@ -9,20 +9,22 @@ edition = "2018"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-rug = { version = "1.3", default-features = false, features = ["integer"] } # GMP - Big Integers
+rug = { version = "=1.4.0", default-features = false, features = ["integer"] } # GMP - Big Integers
 
 [dev-dependencies]
 secp256k1 = { version = "0.12.2", features = ["rand" ] }
 #numext-fixed-uint = "0.1.4"
 rustc-hex = "2"
 
-# [profile.release]
-# lto = true
-
-[build-dependencies]
-# cbindgen = "0.8" Replace back after https://github.com/eqrion/cbindgen/pull/363 Is merged.
-cbindgen = { version = "0.8", git = "https://github.com/elichai/cbindgen.git", branch = "features", default-features = false, optional = true }
 
 [features]
-ffi = ["cbindgen"]
 nightly = []
+generate-ffi = []
+
+[profile.bench]
+opt-level = 3
+debug = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+overflow-checks = false

@@ -1,0 +1,6 @@
+language = "C"
+no_includes = true
+braces = "SameLine"
+line_length = 120
+tab_width = 2
+documentation_style = "auto"

@@ -8,9 +8,7 @@
  * 1 - Finished successfully.
  * 0 - Failed.
  */
-int ecc_secp256k1_ecdsa_sign(unsigned char *sig_out,
-                             const unsigned char *msg,
-                             const unsigned char *privkey);
+int ecc_secp256k1_ecdsa_sign(unsigned char *sig_out, const unsigned char *msg, const unsigned char *privkey);
 
 /**
  * Verify a ECDSA Signature
@@ -39,9 +37,7 @@ int ecc_secp256k1_ecdsa_verify(const unsigned char *sig,
  * 1 - Finished successfully.
  * 0 - Failed.
  */
-int ecc_secp256k1_schnorr_sign(unsigned char *sig_out,
-                               const unsigned char *msg,
-                               const unsigned char *privkey);
+int ecc_secp256k1_schnorr_sign(unsigned char *sig_out, const unsigned char *msg, const unsigned char *privkey);
 
 /**
  * Verify a Schnorr Signature
