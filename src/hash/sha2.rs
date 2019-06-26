@@ -5,13 +5,13 @@ const U32_ALIGN: usize = mem::align_of::<u32>();
 const BLOCK_SIZE: usize = 64;
 const BLOCK_SIZE_BITS: u64 = BLOCK_SIZE as u64 * 8;
 
-struct Sha2 {
+pub struct Sha256 {
     hash: [u32; 8],
     curr: Vec64,
     len: u64,
 }
 
-impl Sha2 {
+impl Sha256 {
     pub fn process_block(&mut self, block: [u32; 16]) {
         let mut W = [0u32; BLOCK_SIZE];
         W[..16].copy_from_slice(&block);
@@ -221,6 +221,9 @@ impl MutArithmetics for u32 {
     }
 }
 
+impl Default for Sha256 {
+    fn default() -> Self { Self::new() }
+}
 
 #[cfg(test)]
 mod tests {
@@ -235,7 +238,7 @@ mod tests {
                          [0xcf5b16a7, 0x78af8380, 0x036ce59e, 0x7b049237, 0x0b249b11, 0xe8f07a51, 0xafac4503, 0x7afee9d1]));
         assert!(test_vec(&[b'a'; 1_000_000], [0xcdc76e5c, 0x9914fb92, 0x81a1c7e2, 0x84d73e67, 0xf1809a48, 0xa497200e, 0x046d39cc, 0xc7112cd0]));
 
-        let mut hash = Sha2::new();
+        let mut hash = Sha256::new();
         for _ in 0..16_777_216 {
             hash.input(b"abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno");
         }
@@ -243,7 +246,7 @@ mod tests {
     }
 
     fn test_vec(input: &[u8], res: [u32; 8]) -> bool {
-        let mut hash = Sha2::new();
+        let mut hash = Sha256::new();
         hash.input(input);
         let input = hash.finalize_internal();
         input == res
@@ -263,7 +266,7 @@ mod benches {
     pub fn my_sha2(bh: &mut Bencher) {
         let mut data = [01u8; MiB];
         bh.iter(|| {
-            let mut hash = Sha2::new();
+            let mut hash = Sha256::new();
             hash.input(&data);
             black_box(hash.finalize());
         });

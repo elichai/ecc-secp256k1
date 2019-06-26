@@ -1,4 +1,7 @@
-use sha2::{Digest, Sha256};
+pub mod hmac_sha2;
+mod sha2;
+
+use sha2::Sha256;
 
 #[derive(Default)]
 pub(crate) struct HashDigest {
@@ -15,9 +18,7 @@ impl HashDigest {
     }
 
     pub fn result(self) -> [u8; 32] {
-        let mut res = [0u8; 32];
-        res.copy_from_slice(&self.h.result());
-        res
+        self.h.finalize()
     }
 }
 
@@ -31,8 +32,6 @@ impl HashTrait<[u8; 32]> for [u8] {
     fn hash_digest(&self) -> [u8; 32] {
         let mut hasher = HashDigest::new();
         hasher.input(&self);
-        let mut result = [0u8; 32];
-        result.copy_from_slice(&hasher.result());
-        result
+        hasher.result()
     }
 }

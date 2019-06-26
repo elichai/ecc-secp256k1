@@ -1,6 +1,8 @@
+#![cfg_attr(feature = "nightly", feature(test))]
+
+
 mod field;
 mod hash;
-mod hmac_sha2;
 pub mod internal;
 mod jacobi;
 mod point;
@@ -14,6 +16,7 @@ mod test_vectors;
 mod test_rust_secp256k1;
 
 pub use crate::secp256k1::{PrivateKey, PublicKey, SchnorrSignature, Signature};
+pub use hash::*;
 
 #[cfg(feature = "ffi")]
 pub use crate::ffi::{ecdsa::*, schnorr::*, *};

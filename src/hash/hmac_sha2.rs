@@ -38,7 +38,6 @@ impl HmacSha256 {
         Self { inner, outer }
     }
 
-
     pub fn input(&mut self, text: &[u8]) {
         self.inner.input(text)
     }
@@ -141,12 +140,7 @@ mod tests {
             hex("82558a389a443c0ea4cc819899f2083a85f0faa3e578f8077a2e3ff46729665b"),
             None
         ));
-        assert!(test_vector(
-            [0x0C_u8; 20],
-            b"Test With Truncation",
-            hex("a3b6167473100ee06e0c796c2955552b"),
-            Some(16)
-        ));
+        assert!(test_vector([0x0C_u8; 20], b"Test With Truncation", hex("a3b6167473100ee06e0c796c2955552b"), Some(16)));
         assert!(test_vector(
             &[0xAA; 131][..],
             &b"Test Using Larger Than Block-Size Key - Hash Key First"[..],
