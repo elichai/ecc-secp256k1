@@ -13,7 +13,6 @@ mod ffi;
 #[cfg(test)]
 mod test_vectors;
 
-mod test_rust_secp256k1;
 
 pub use crate::secp256k1::{PrivateKey, PublicKey, SchnorrSignature, Signature};
 pub use hash::*;

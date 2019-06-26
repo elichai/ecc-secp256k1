@@ -16,6 +16,7 @@ pub struct TestVector {
     pub verify_result: bool,
 }
 
+#[rustfmt::skip]
 pub const SCHNORR_VECTORS: [TestVector; 16] = [
     TestVector {
         /* Test vector 1 */

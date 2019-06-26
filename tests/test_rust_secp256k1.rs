@@ -1,9 +1,8 @@
-#![cfg(test)]
+//#![cfg(test)]
 
 extern crate secp256k1 as test_secp256k1;
 
-use crate::hash::HashTrait;
-use crate::{PrivateKey, PublicKey, Signature};
+use ecc_secp256k1::{HashTrait, PrivateKey, PublicKey, Signature};
 use test_secp256k1::rand::{thread_rng, Rng};
 use test_secp256k1::{
     rand::thread_rng as TestRng, Message as TestMessage, PublicKey as TestPublicKey, Secp256k1 as TestSecp256k1,
