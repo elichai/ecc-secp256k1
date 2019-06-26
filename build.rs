@@ -1,19 +1,12 @@
 fn main() {
-    #[cfg(feature = "ffi")]
+    #[cfg(feature = "generate-ffi")]
     {
-        use cbindgen::{Builder, Language};
-        use std::{env, path::PathBuf};
+        use std::fs;
+        use std::process::Command;
+        println!("cargo:rerun-if-changed=ecc_secp256k1.h");
 
-        let target = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-        let package_name = env::var("CARGO_PKG_NAME").unwrap().replace("-", "_");
-        let output_file = target.join(format!("{}.h", package_name));
+        let res = Command::new("cbindgen").output().expect("Faild. do you have `cbindgen` installed?");
 
-        Builder::new()
-            .with_no_includes()
-            .with_language(Language::C)
-            .with_crate(&target)
-            .generate()
-            .expect("Unable to generate bindings")
-            .write_to_file(&output_file);
+        fs::write("./ecc_secp256k1.h", res.stdout).expect("Failed writing the bindings to file");
     }
 }

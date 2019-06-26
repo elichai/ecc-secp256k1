@@ -1,6 +1,6 @@
-use std::{io::Read, mem, slice, fmt};
+#![allow(clippy::unreadable_literal, clippy::many_single_char_names)]
+use std::{fmt, mem};
 
-const U32_SIZE: usize = mem::size_of::<u32>();
 const U32_ALIGN: usize = mem::align_of::<u32>();
 const BLOCK_SIZE: usize = 64;
 const BLOCK_SIZE_BITS: u64 = BLOCK_SIZE as u64 * 8;
@@ -12,16 +12,16 @@ pub struct Sha256 {
 }
 
 impl Sha256 {
+    #[allow(non_snake_case)]
     pub fn process_block(&mut self, block: [u32; 16]) {
         let mut W = [0u32; BLOCK_SIZE];
         W[..16].copy_from_slice(&block);
 
         for t in 16..BLOCK_SIZE {
-            W[t] = s_sigma1(W[t - 2]).wrapping_add(W[t - 7]).wrapping_add(s_sigma0(W[t-15])).wrapping_add(W[t - 16]);
+            W[t] = s_sigma1(W[t - 2]).wrapping_add(W[t - 7]).wrapping_add(s_sigma0(W[t - 15])).wrapping_add(W[t - 16]);
         }
         let H = &mut self.hash;
         let (mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut h) = (H[0], H[1], H[2], H[3], H[4], H[5], H[6], H[7]);
-
 
         for t in 0..BLOCK_SIZE {
             let T1 = h.wrapping_add(b_sigma1(e)).wrapping_add(choose(e, f, g)).wrapping_add(K[t]).wrapping_add(W[t]);
@@ -67,12 +67,14 @@ impl Sha256 {
     #[inline(always)]
     fn finalize_internal(mut self) -> [u32; 8] {
         let zeroes = [0u8; BLOCK_SIZE_BITS as usize - BLOCK_SIZE - 1];
+
         let len: u64 = self.len;
-        let last_block_len: u64 =  BLOCK_SIZE_BITS - BLOCK_SIZE as u64;
-        let mut how_many_zeros: u64 = last_block_len.wrapping_sub(8).wrapping_sub(len) % BLOCK_SIZE_BITS;
+        let last_block_len: u64 = BLOCK_SIZE_BITS - BLOCK_SIZE as u64;
+        let how_many_zeros: u64 = last_block_len.wrapping_sub(8).wrapping_sub(len) % BLOCK_SIZE_BITS;
+
         self.input(&[0b10000000]);
         if how_many_zeros != 0 {
-            self.input(&zeroes[..(how_many_zeros/8) as usize]);
+            self.input(&zeroes[..(how_many_zeros / 8) as usize]);
         }
         self.input(&len.to_be_bytes());
         if self.curr.pos as usize == BLOCK_SIZE {
@@ -82,15 +84,13 @@ impl Sha256 {
         self.hash
     }
 
-    pub fn finalize(mut self) -> [u8; 32] {
-
+    pub fn finalize(self) -> [u8; 32] {
         let mut hash = self.finalize_internal();
 
         debug_assert_eq!(mem::size_of_val(&hash), mem::size_of::<[u8; 32]>());
 
         memory_le_to_be(&mut hash);
-        let mut res = unsafe { *(hash.as_ptr() as *const u8 as *const [u8; 32]) };
-        res
+        unsafe { *(hash.as_ptr() as *const u8 as *const [u8; 32]) }
     }
 
     pub fn process_current_block(&mut self) {
@@ -131,26 +131,19 @@ struct Vec64 {
     pos: u8,
 }
 
-
-
 impl Vec64 {
     const BUF_SIZE: u8 = 64;
 
     #[inline]
-    pub fn push(&mut self, byte: u8) -> bool {
-        if self.is_full() {
-            unreachable!();
-            false
-        } else {
-            self.data[self.pos as usize] = byte;
-            self.pos += 1;
-            true
-        }
+    pub fn push(&mut self, byte: u8) {
+        debug_assert!(!self.is_full());
+        self.data[self.pos as usize] = byte;
+        self.pos += 1;
     }
 
     pub fn to_data(&self) -> [u32; 16] {
         let ptr = self.data.as_ptr();
-        assert_eq!(ptr as usize % U32_ALIGN, 0);
+        debug_assert_eq!(ptr as usize % U32_ALIGN, 0);
         let mut res = unsafe { *(ptr as *const u32 as *const [u32; 16]) };
         memory_le_to_be(&mut res);
         res
@@ -161,7 +154,7 @@ impl Vec64 {
     }
 
     pub fn clear(&mut self) {
-        *self = Self::empty();
+        self.pos = 0;
     }
 
     pub fn is_full(&self) -> bool {
@@ -209,7 +202,6 @@ const K: [u32; 64] = [
     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 ];
 
-
 pub trait MutArithmetics {
     fn wrapping_add_mut(&mut self, rhs: u32);
 }
@@ -222,7 +214,9 @@ impl MutArithmetics for u32 {
 }
 
 impl Default for Sha256 {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -233,16 +227,30 @@ mod tests {
     fn test_sha2_test_vectors() {
         assert!(test_vec(b"abc", [0xba7816bf, 0x8f01cfea, 0x414140de, 0x5dae2223, 0xb00361a3, 0x96177a9c, 0xb410ff61, 0xf20015ad]));
         assert!(test_vec(b"", [0xe3b0c442, 0x98fc1c14, 0x9afbf4c8, 0x996fb924, 0x27ae41e4, 0x649b934c, 0xa495991b, 0x7852b855]));
-        assert!(test_vec(b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", [0x248d6a61, 0xd20638b8, 0xe5c02693, 0x0c3e6039, 0xa33ce459, 0x64ff2167, 0xf6ecedd4, 0x19db06c1]));
-        assert!(test_vec(b"abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
-                         [0xcf5b16a7, 0x78af8380, 0x036ce59e, 0x7b049237, 0x0b249b11, 0xe8f07a51, 0xafac4503, 0x7afee9d1]));
-        assert!(test_vec(&[b'a'; 1_000_000], [0xcdc76e5c, 0x9914fb92, 0x81a1c7e2, 0x84d73e67, 0xf1809a48, 0xa497200e, 0x046d39cc, 0xc7112cd0]));
+        assert!(test_vec(
+            b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+            [0x248d6a61, 0xd20638b8, 0xe5c02693, 0x0c3e6039, 0xa33ce459, 0x64ff2167, 0xf6ecedd4, 0x19db06c1]
+        ));
+        assert!(test_vec(
+            b"abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
+            [0xcf5b16a7, 0x78af8380, 0x036ce59e, 0x7b049237, 0x0b249b11, 0xe8f07a51, 0xafac4503, 0x7afee9d1]
+        ));
+        assert!(test_vec(
+            &[b'a'; 1_000_000],
+            [0xcdc76e5c, 0x9914fb92, 0x81a1c7e2, 0x84d73e67, 0xf1809a48, 0xa497200e, 0x046d39cc, 0xc7112cd0]
+        ));
 
-        let mut hash = Sha256::new();
-        for _ in 0..16_777_216 {
-            hash.input(b"abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno");
+        #[cfg(not(debug_assertions))]
+        {
+            let mut hash = Sha256::new();
+            for _ in 0..16_777_216 {
+                hash.input(b"abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno");
+            }
+            assert_eq!(
+                hash.finalize_internal(),
+                [0x50e72a0e, 0x26442fe2, 0x552dc393, 0x8ac58658, 0x228c0cbf, 0xb1d2ca87, 0x2ae43526, 0x6fcd055e]
+            )
         }
-        assert_eq!(hash.finalize_internal(), [0x50e72a0e, 0x26442fe2, 0x552dc393, 0x8ac58658, 0x228c0cbf, 0xb1d2ca87, 0x2ae43526, 0x6fcd055e])
     }
 
     fn test_vec(input: &[u8], res: [u32; 8]) -> bool {
@@ -253,8 +261,6 @@ mod tests {
     }
 }
 
-
-
 #[cfg(all(test, feature = "nightly"))]
 mod benches {
     extern crate test;
@@ -264,7 +270,7 @@ mod benches {
 
     #[bench]
     pub fn my_sha2(bh: &mut Bencher) {
-        let mut data = [01u8; MiB];
+        let data = [01u8; MiB];
         bh.iter(|| {
             let mut hash = Sha256::new();
             hash.input(&data);

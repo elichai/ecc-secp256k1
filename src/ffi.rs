@@ -74,7 +74,7 @@ pub mod ecdsa {
         let sig = slice::from_raw_parts(sig, 64);
         let sig = Signature::parse_slice(sig);
         if pubkey.verify(msg, sig, false) {
-            return 1;
+            1
         } else {
             0
         }
@@ -155,7 +155,7 @@ pub mod schnorr {
         let sig = slice::from_raw_parts(sig, 64);
         let sig = SchnorrSignature::parse_slice(sig);
         if pubkey.verify_schnorr(msg, sig, false) {
-            return 1;
+            1
         } else {
             0
         }
