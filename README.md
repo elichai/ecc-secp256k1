@@ -15,7 +15,7 @@ It provides both low level API (Mul/Add/Div etc.), and Private/Public Keys inter
 - [x] ~~Add NIST test vectors~~
 - [x] Replace random `k` with deterministic(ECDSA).
 - [ ] Remove the usage of GMP library.
-- [ ] Look into implementing sha2 myself.
+- [x] Look into implementing sha2 myself.
 - [ ] Remove all `unimplemented!()` and add checks for the points all over.
 - [x] Add BIP Schnorr support. 
 - [x] Add BIP Schnorr Test vectors.
