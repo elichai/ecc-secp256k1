@@ -4,7 +4,7 @@ use crate::hmac_sha2::{HmacSha256, HmacSha256Drbg};
 use crate::jacobi;
 use crate::jacobi::Jacobi;
 use crate::point::{Group, Point};
-use rug::{integer::Order, Integer};
+use num_bigint::{BigInt, Sign};
 use std::{
     fmt,
     io::{BufReader, Read},
@@ -14,8 +14,8 @@ use std::{
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Secp256k1 {
-    pub modulo: Integer,
-    pub order: Integer,
+    pub modulo: BigInt,
+    pub order: BigInt,
     generator: Point,
 }
 
@@ -31,14 +31,14 @@ impl Secp256k1 {
 
     #[allow(clippy::many_single_char_names)]
     pub fn new() -> Secp256k1 {
-        let x: Integer = Self::Gx.parse().unwrap();
-        let y: Integer = Self::Gy.parse().unwrap();
-        let p: Integer = Self::p.parse().unwrap();
-        let n: Integer = Self::n.parse().unwrap();
-        let a = Integer::from(Self::a);
-        let b = Integer::from(Self::b);
+        let x: BigInt = Self::Gx.parse().unwrap();
+        let y: BigInt = Self::Gy.parse().unwrap();
+        let p: BigInt = Self::p.parse().unwrap();
+        let n: BigInt = Self::n.parse().unwrap();
+        let a = BigInt::from(Self::a);
+        let b = BigInt::from(Self::b);
         let group = Group { a, b };
-        let point = Point::new_with_group(x, y, &p, group).unwrap();
+        let point = Point::new_with_group(x, y, p.clone(), group).unwrap();
         Secp256k1 { generator: point, modulo: p, order: n }
     }
 
@@ -47,12 +47,12 @@ impl Secp256k1 {
     }
 
     pub fn get_fe(&self, num: &[u8]) -> FieldElement {
-        FieldElement::from_serialize(&num, &self.modulo)
+        FieldElement::from_serialize(num, self.modulo.clone())
     }
 
     pub fn get_pubkey(&self, x: &[u8], y: &[u8]) -> PublicKey {
-        let x = FieldElement::from_serialize(x, &self.modulo);
-        let y = FieldElement::from_serialize(y, &self.modulo);
+        let x = FieldElement::from_serialize(x, self.modulo.clone());
+        let y = FieldElement::from_serialize(y, self.modulo.clone());
         let point = Point { x, y, group: self.generator.group.clone() };
         if !point.is_on_curve() {
             unimplemented!();
@@ -63,7 +63,8 @@ impl Secp256k1 {
     // TODO: Hard code this.
     pub fn serialized_order(&self) -> [u8; 32] {
         let mut res = [0u8; 32];
-        let serialized = self.order.to_digits(Order::MsfLe);
+        let (sign, serialized) = self.order.to_bytes_be();
+        assert_ne!(sign, Sign::Minus);
         if serialized.len() > 32 {
             unimplemented!();
         }
@@ -73,7 +74,7 @@ impl Secp256k1 {
 }
 
 pub struct PrivateKey {
-    scalar: Integer,
+    scalar: BigInt,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -103,8 +104,8 @@ impl PublicKey {
         if ser[0] != 0x04 {
             unimplemented!()
         }
-        let x = FieldElement::from_serialize(&ser[1..33], &secp.modulo);
-        let y = FieldElement::from_serialize(&ser[33..65], &secp.modulo);
+        let x = FieldElement::from_serialize(&ser[1..33], secp.modulo.clone());
+        let y = FieldElement::from_serialize(&ser[33..65], secp.modulo.clone());
         let point = Point { x, y, group: secp.generator.group.clone() };
         if !point.is_on_curve() {
             unimplemented!();
@@ -114,7 +115,7 @@ impl PublicKey {
 
     pub fn from_compressed(ser: &[u8]) -> Result<PublicKey, &'static str> {
         let secp = get_context();
-        let x = FieldElement::from_serialize(&ser[1..33], &secp.modulo);
+        let x = FieldElement::from_serialize(&ser[1..33], secp.modulo.clone());
         let mut y = secp.generator.group.get_y(&x);
         let is_even = y.is_even();
         if (ser[0] == 0x02 && !is_even) || (ser[0] == 0x03 && is_even) {
@@ -142,9 +143,9 @@ impl PublicKey {
     pub fn verify(&self, msg: &[u8], sig: Signature, to_hash: bool) -> bool {
         let order = &get_context().order;
         let msg_hash = get_hashed_message_if(msg, to_hash);
-        let z = FieldElement::from_serialize(&msg_hash, order);
-        let r = FieldElement::from_serialize(&sig.r.0, order);
-        let s = FieldElement::from_serialize(&sig.s.0, order);
+        let z = FieldElement::from_serialize(&msg_hash, order.clone());
+        let r = FieldElement::from_serialize(&sig.r.0, order.clone());
+        let s = FieldElement::from_serialize(&sig.s.0, order.clone());
         self.verify_raw(z, r, s)
     }
 
@@ -152,8 +153,8 @@ impl PublicKey {
     pub fn verify_schnorr(&self, msg: &[u8], sig: SchnorrSignature, to_hash: bool) -> bool {
         let m = get_hashed_message_if(msg, to_hash);
         let order = &get_context().order;
-        let r = FieldElement::from_serialize(&sig.0.r.0, order);
-        let s = FieldElement::from_serialize(&sig.0.s.0, order);
+        let r = FieldElement::from_serialize(&sig.0.r.0, order.clone());
+        let s = FieldElement::from_serialize(&sig.0.s.0, order.clone());
 
         let e = get_e(r.clone(), self.clone(), m);
 
@@ -179,7 +180,7 @@ impl PublicKey {
 }
 
 impl PrivateKey {
-    pub fn new<I: Into<Integer>>(key: I) -> Self {
+    pub fn new<I: Into<BigInt>>(key: I) -> Self {
         PrivateKey { scalar: key.into() }
     }
 
@@ -200,7 +201,7 @@ impl PrivateKey {
         result
     }
 
-    pub(crate) fn sign_raw(d: &Integer, k: FieldElement, z: FieldElement) -> Signature {
+    pub(crate) fn sign_raw(d: &BigInt, k: FieldElement, z: FieldElement) -> Signature {
         let secp = get_context();
         let k_point: Point = &k.num * secp.generator();
         let order = &secp.order;
@@ -208,7 +209,7 @@ impl PrivateKey {
         r.modulo = order.clone();
         r.mod_num().round_mod();
         let mut s: FieldElement = (z + (r.clone() * d)) / k;
-        if s.num > Integer::from(order / 2) {
+        if s.num > BigInt::from(order / 2u32) {
             s = order - s;
         }
         if r.is_zero() || s.is_zero() {
@@ -224,7 +225,7 @@ impl PrivateKey {
         let msg_hash = get_hashed_message_if(msg, to_hash);
 
         let k = self.deterministic_k_ecdsa(msg_hash);
-        let z = FieldElement::from_serialize(&msg_hash, &secp.order);
+        let z = FieldElement::from_serialize(&msg_hash, secp.order.clone());
         Self::sign_raw(&self.scalar, k, z)
     }
 
@@ -244,7 +245,7 @@ impl PrivateKey {
             state.generate(&mut nonce);
         }
 
-        FieldElement::from_serialize(&nonce, &get_context().order)
+        FieldElement::from_serialize(&nonce, get_context().order.clone())
     }
 
     #[allow(non_snake_case)]
@@ -271,7 +272,7 @@ impl PrivateKey {
         k.input(&d);
         k.input(&m);
         let k = k.result();
-        let mut k = FieldElement::from_serialize(&k, order);
+        let mut k = FieldElement::from_serialize(&k, order.clone());
         k.mod_num();
         // TODO: Check the Jacobi symbol and if not 1 subtract by the group order (https://en.wikipedia.org/wiki/Jacobi_symbol)
         if k.is_zero() {
@@ -282,7 +283,7 @@ impl PrivateKey {
 
     // TODO: Pass Rx instead of R.
     #[allow(non_snake_case)]
-    pub(crate) fn sign_schnorr_raw(d: &Integer, k: FieldElement, e: FieldElement, R: Option<Point>) -> SchnorrSignature {
+    pub(crate) fn sign_schnorr_raw(d: &BigInt, k: FieldElement, e: FieldElement, R: Option<Point>) -> SchnorrSignature {
         let R = R.unwrap_or_else(|| &k.num * get_context().generator());
 
         let s = k + e * d;
@@ -293,7 +294,8 @@ impl PrivateKey {
 
     fn serialize(&self) -> [u8; 32] {
         let mut res = [0u8; 32];
-        let serialized = self.scalar.to_digits(Order::MsfLe);
+        let (sign, serialized) = self.scalar.to_bytes_be();
+        assert_ne!(sign, Sign::Minus);
         if serialized.len() > 32 {
             unimplemented!();
         }
@@ -301,8 +303,9 @@ impl PrivateKey {
         res
     }
 
+    // TODO: make [u8;32]
     pub fn from_serialized(ser: &[u8]) -> PrivateKey {
-        let i = Integer::from_digits(ser, Order::MsfLe);
+        let i = BigInt::from_bytes_be(Sign::Plus, ser);
         PrivateKey::new(i)
     }
 }
@@ -314,7 +317,7 @@ fn get_e(xR: FieldElement, pubkey: PublicKey, msg: [u8; 32]) -> FieldElement {
     e.input(&xR.serialize_num());
     e.input(&pubkey.compressed());
     e.input(&msg);
-    FieldElement::from_serialize(&e.result(), &secp.order)
+    FieldElement::from_serialize(&e.result(), secp.order.clone())
 }
 
 fn get_hashed_message_if(msg: &[u8], to_hash: bool) -> [u8; 32] {
@@ -531,7 +534,7 @@ mod test {
 
     #[test]
     fn test_compress_pubkey() {
-        let privkey = PrivateKey::new(32432432);
+        let privkey = PrivateKey::new(32432432u32);
         let pubkey = privkey.generate_pubkey();
         let compress = pubkey.clone().compressed();
         assert_eq!(PublicKey::from_compressed(&compress).unwrap(), pubkey);
@@ -539,7 +542,7 @@ mod test {
 
     #[test]
     fn test_uncompressed_pubkey() {
-        let privkey = PrivateKey::new(32432432);
+        let privkey = PrivateKey::new(32432432u32);
         let pubkey = privkey.generate_pubkey();
         let compress = pubkey.clone().uncompressed();
         assert_eq!(PublicKey::from_uncompressed(&compress), pubkey);

@@ -9,13 +9,23 @@ edition = "2018"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-rug = { version = "=1.4.0", default-features = false, features = ["integer"] } # GMP - Big Integers
-
+num-bigint = "0.4"
+num-integer = "0.1"
 [dev-dependencies]
-secp256k1 = { version = "0.12.2", features = ["rand" ] }
+secp256k1 = { version = "0.22", features = ["rand-std", "global-context" ] }
 #numext-fixed-uint = "0.1.4"
 rustc-hex = "2"
+criterion = "0.3"
 
+[[bench]]
+name = "bench"
+harness = false
+
+[profile.release]
+debug = true
+lto = true
+debug-assertions = false
+overflow-checks = false
 
 [features]
 nightly = []

@@ -31,7 +31,7 @@ pub trait HashTrait<T> {
 impl HashTrait<[u8; 32]> for [u8] {
     fn hash_digest(&self) -> [u8; 32] {
         let mut hasher = HashDigest::new();
-        hasher.input(&self);
+        hasher.input(self);
         hasher.result()
     }
 }

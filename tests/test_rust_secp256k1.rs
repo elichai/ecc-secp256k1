@@ -3,10 +3,9 @@
 extern crate secp256k1 as test_secp256k1;
 
 use ecc_secp256k1::{HashTrait, PrivateKey, PublicKey, Signature};
-use test_secp256k1::rand::{thread_rng, Rng};
+use test_secp256k1::rand::{thread_rng, Rng, RngCore};
 use test_secp256k1::{
-    rand::thread_rng as TestRng, Message as TestMessage, PublicKey as TestPublicKey, Secp256k1 as TestSecp256k1,
-    SecretKey as TestPrivateKey, Signature as TestSignature,
+    ecdsa::Signature as TestSignature, Message as TestMessage, PublicKey as TestPublicKey, SecretKey as TestPrivateKey, SECP256K1,
 };
 
 #[test]
@@ -22,13 +21,12 @@ fn test_cmp_sign_der() {
 
     // Verify with rust-secp256k1
 
-    let secp = TestSecp256k1::verification_only();
     let pubkey = TestPublicKey::from_slice(&pubkey).unwrap();
     let msg = TestMessage::from_slice(&msg.hash_digest()).unwrap();
     let sig = TestSignature::from_der(&orig_sig.serialize_der()).unwrap();
 
-    assert_eq!(sig.serialize_der(), orig_sig.serialize_der());
-    assert!(secp.verify(&msg, &sig, &pubkey).is_ok())
+    assert_eq!(&sig.serialize_der()[..], &orig_sig.serialize_der()[..]);
+    assert!(SECP256K1.verify_ecdsa(&msg, &sig, &pubkey).is_ok())
 }
 
 #[test]
@@ -44,12 +42,11 @@ fn test_cmp_sign_compact() {
 
     // Verify with rust-secp256k1
 
-    let secp = TestSecp256k1::verification_only();
     let pubkey = TestPublicKey::from_slice(&pubkey).unwrap();
     let msg = TestMessage::from_slice(&msg.hash_digest()).unwrap();
     let sig = TestSignature::from_compact(&orig_sig).unwrap();
     assert_eq!(&sig.serialize_compact()[..], &orig_sig[..]);
-    assert!(secp.verify(&msg, &sig, &pubkey).is_ok())
+    assert!(SECP256K1.verify_ecdsa(&msg, &sig, &pubkey).is_ok())
 }
 
 fn get_rand_msg() -> Vec<u8> {
@@ -63,12 +60,11 @@ fn get_rand_msg() -> Vec<u8> {
 #[test]
 fn test_cmp_verify_compact_uncompressed() {
     // Sign with rust-secp256k1
-    let secp = TestSecp256k1::new();
     let orig_msg = get_rand_msg();
     let msg = TestMessage::from_slice(&orig_msg.hash_digest()).unwrap();
-    let privkey = TestPrivateKey::new(&mut TestRng());
-    let sig = secp.sign(&msg, &privkey).serialize_compact();
-    let pubkey = TestPublicKey::from_secret_key(&secp, &privkey).serialize_uncompressed();
+    let privkey = TestPrivateKey::new(&mut thread_rng());
+    let sig = SECP256K1.sign_ecdsa(&msg, &privkey).serialize_compact();
+    let pubkey = TestPublicKey::from_secret_key(&SECP256K1, &privkey).serialize_uncompressed();
 
     // Verify with This library
 
@@ -80,12 +76,11 @@ fn test_cmp_verify_compact_uncompressed() {
 #[test]
 fn test_cmp_verify_der_compressed() {
     // Sign with rust-secp256k1
-    let secp = TestSecp256k1::new();
     let orig_msg = get_rand_msg();
     let msg = TestMessage::from_slice(&orig_msg.hash_digest()).unwrap();
-    let privkey = TestPrivateKey::new(&mut TestRng());
-    let sig = secp.sign(&msg, &privkey);
-    let pubkey = TestPublicKey::from_secret_key(&secp, &privkey).serialize();
+    let privkey = TestPrivateKey::new(&mut thread_rng());
+    let sig = SECP256K1.sign_ecdsa(&msg, &privkey);
+    let pubkey = TestPublicKey::from_secret_key(&SECP256K1, &privkey).serialize();
 
     // Verify with This library
 
@@ -96,12 +91,11 @@ fn test_cmp_verify_der_compressed() {
 
 #[test]
 fn test_compare_sigs() {
-    let secp = TestSecp256k1::new();
     let orig_msg = get_rand_msg();
 
     let test_msg = TestMessage::from_slice(&orig_msg.hash_digest()).unwrap();
-    let test_privkey = TestPrivateKey::new(&mut TestRng());
-    let test_sig = secp.sign(&test_msg, &test_privkey).serialize_compact();
+    let test_privkey = TestPrivateKey::new(&mut thread_rng());
+    let test_sig = SECP256K1.sign_ecdsa(&test_msg, &test_privkey).serialize_compact();
 
     let my_privkey = PrivateKey::from_serialized(&test_privkey[..]);
     let my_sig = my_privkey.sign(&orig_msg, true).serialize();

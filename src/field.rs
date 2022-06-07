@@ -1,10 +1,11 @@
-use rug::{integer::Order, ops::NegAssign, Integer};
+use num_bigint::{BigInt, Sign};
+use num_integer::Integer;
 use std::{fmt, ops::*};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FieldElement {
-    pub num: Integer,
-    pub modulo: Integer,
+    pub num: BigInt,
+    pub modulo: BigInt,
 }
 
 impl fmt::Display for FieldElement {
@@ -14,40 +15,40 @@ impl fmt::Display for FieldElement {
 }
 
 impl FieldElement {
-    const ORDER: Order = Order::MsfLe;
-    pub fn new<I: Into<Integer>, T: Into<Integer>>(num: I, modulo: T) -> FieldElement {
+    pub fn new<I: Into<BigInt>, T: Into<BigInt>>(num: I, modulo: T) -> FieldElement {
         let mut res = FieldElement { num: num.into(), modulo: modulo.into() };
         res.mod_num();
         res
     }
 
-    pub fn infinity<I: Into<Integer>>(modulo: I) -> FieldElement {
-        Self { num: 0.into(), modulo: modulo.into() } // Right now I'm representing Infinity as (0,0).
-    }
-    pub fn is_infinity(&self) -> bool {
-        self == &Self::infinity(&self.modulo)
-    }
-    pub fn is_zero(&self) -> bool {
-        self.num == 0
+    pub fn infinity(modulo: BigInt) -> FieldElement {
+        Self { num: 0u32.into(), modulo } // Right now I'm representing Infinity as (0,0).
     }
 
-    pub fn pow_u<I: Into<Integer>>(self, other: I) -> FieldElement {
-        let num = (self.num.pow_mod(&other.into(), &self.modulo)).unwrap();
+    pub fn is_infinity(&self) -> bool {
+        self == &Self::infinity(self.modulo.clone())
+    }
+    pub fn is_zero(&self) -> bool {
+        self.num == BigInt::from(0u32)
+    }
+
+    pub fn pow_u<I: Into<BigInt>>(self, other: I) -> FieldElement {
+        let num = self.num.modpow(&other.into(), &self.modulo);
         FieldElement { num, modulo: self.modulo }
     }
 
     #[inline(always)]
     pub fn pow(self, other: FieldElement) -> FieldElement {
         self.same_modulo(&other);
-        let num = (self.num.pow_mod(&other.num, &self.modulo)).unwrap();
+        let num = self.num.modpow(&other.num, &self.modulo);
         FieldElement { num, modulo: self.modulo }
     }
 
     #[inline(always)]
     pub fn sqrt(&mut self) {
-        let mut p: Integer = self.modulo.clone() + 1;
-        p.div_exact_mut(&4.into());
-        self.num.pow_mod_mut(&p, &self.modulo).unwrap();
+        let mut p: BigInt = self.modulo.clone() + 1u32;
+        p /= 4u32;
+        self.num = self.num.modpow(&p, &self.modulo);
     }
 
     #[inline(always)]
@@ -58,30 +59,30 @@ impl FieldElement {
     }
     #[inline(always)]
     pub fn round_mod(&mut self) {
-        if self.num < 0 {
+        if self.num.sign() == Sign::Minus {
             self.num += &self.modulo;
         }
     }
 
     pub fn mod_num(&mut self) -> &mut Self {
-        self.num = self.num.clone() % &self.modulo;
+        self.num = self.num.mod_floor(&self.modulo);
         self
     }
 
     #[inline(always)]
-    pub fn inner(&self) -> &Integer {
+    pub fn inner(&self) -> &BigInt {
         &self.num
     }
 
     #[inline(always)]
     pub fn reflect(&mut self) {
-        self.num.neg_assign();
-        self.mod_num().round_mod();
+        self.num = &self.modulo - &self.num;
     }
 
     pub fn serialize_num(self) -> [u8; 32] {
         let mut res = [0u8; 32];
-        let serialized = self.num.to_digits(Self::ORDER);
+        let (sign, serialized) = self.num.to_bytes_be();
+        assert_ne!(sign, Sign::Minus);
         if serialized.len() > 32 {
             unimplemented!();
         }
@@ -89,8 +90,8 @@ impl FieldElement {
         res
     }
 
-    pub fn from_serialize<I: Into<Integer>>(ser: &[u8], modulo: I) -> FieldElement {
-        let num = Integer::from_digits(ser, Self::ORDER);
+    pub fn from_serialize<I: Into<BigInt>>(ser: &[u8], modulo: I) -> FieldElement {
+        let num = BigInt::from_bytes_be(Sign::Plus, ser);
         FieldElement { num, modulo: modulo.into() }
     }
 
@@ -100,7 +101,7 @@ impl FieldElement {
 }
 
 #[inline(always)]
-pub fn mod_and_new(num: Integer, modulo: &Integer) -> FieldElement {
+pub fn mod_and_new(num: BigInt, modulo: &BigInt) -> FieldElement {
     let num = num % modulo;
     let mut res = FieldElement { num, modulo: modulo.clone() };
     res.round_mod();
@@ -122,7 +123,7 @@ impl Add<&FieldElement> for FieldElement {
     type Output = FieldElement;
     #[inline(always)]
     fn add(self, other: &Self) -> FieldElement {
-        self.same_modulo(&other);
+        self.same_modulo(other);
         let num = (self.num + &other.num) % &self.modulo;
         let mut res = FieldElement { num, modulo: self.modulo };
         res.round_mod();
@@ -144,7 +145,7 @@ impl Sub<&FieldElement> for FieldElement {
     type Output = FieldElement;
     #[inline(always)]
     fn sub(self, other: &Self) -> FieldElement {
-        self.same_modulo(&other);
+        self.same_modulo(other);
         let num = self.num - &other.num;
         mod_and_new(num, &self.modulo)
     }
@@ -164,7 +165,7 @@ impl Mul<&FieldElement> for FieldElement {
     type Output = FieldElement;
     #[inline(always)]
     fn mul(self, other: &Self) -> FieldElement {
-        self.same_modulo(&other);
+        self.same_modulo(other);
         let num = self.num * &other.num;
         mod_and_new(num, &self.modulo)
     }
@@ -175,13 +176,7 @@ impl Div for FieldElement {
     #[allow(clippy::suspicious_arithmetic_impl)]
     #[inline(always)]
     fn div(self, other: Self) -> FieldElement {
-        let mut other = other;
-        self.same_modulo(&other);
-        let p = &self.modulo - Integer::from(2);
-        other.num = other.num.pow_mod(&p, &self.modulo).unwrap();
-        let mut res = self * other;
-        res.round_mod();
-        res
+        self.div(&other)
     }
 }
 
@@ -192,8 +187,8 @@ impl Div<&FieldElement> for FieldElement {
     fn div(self, other: &Self) -> FieldElement {
         let mut other = other.clone();
         self.same_modulo(&other);
-        let p = &self.modulo - Integer::from(2);
-        other.num = other.num.pow_mod(&p, &self.modulo).unwrap();
+        let p = &self.modulo - 2u32;
+        other.num = other.num.modpow(&p, &self.modulo);
         let mut res = self * other;
         res.round_mod();
         res
@@ -206,7 +201,7 @@ macro_rules! mul_impl_field {
         type Output = FieldElement;
             #[inline]
             fn mul(self, other: $t) -> FieldElement {
-                let other: Integer = other.into();
+                let other: BigInt = other.into();
                 let num = self.num * other;
                 mod_and_new(num, &self.modulo)
             }
@@ -217,7 +212,7 @@ macro_rules! mul_impl_field {
 
             #[inline]
             fn mul(self, other: &$t) -> FieldElement {
-                let other: Integer = Integer::from(other.clone());
+                let other: BigInt = BigInt::from(other.clone());
                 let num = self.num * other;
                 mod_and_new(num, &self.modulo)
             }
@@ -237,7 +232,7 @@ macro_rules! mul_impl_field {
 
             #[inline]
             fn mul(self, other: &FieldElement) -> FieldElement {
-                let s: Integer = self.into();
+                let s: BigInt = self.into();
                 let num = &other.num * s;
                 mod_and_new(num, &other.modulo)
             }
@@ -250,7 +245,7 @@ macro_rules! add_impl_field {
        impl Add<$t> for FieldElement {
        type Output = FieldElement;
             fn add(self, other: $t) -> FieldElement {
-                let other = FieldElement::new(other, &self.modulo);
+                let other = FieldElement::new(other, self.modulo.clone());
                 self + other
             }
         }
@@ -263,14 +258,14 @@ macro_rules! add_impl_field {
        impl Add<&$t> for FieldElement {
        type Output = FieldElement;
             fn add(self, other: &$t) -> FieldElement {
-                let other = FieldElement::new(other.clone(), &self.modulo);
+                let other = FieldElement::new(other.clone(), self.modulo.clone());
                 self + other
             }
         }
        impl Add<&FieldElement> for $t {
        type Output = FieldElement;
             fn add(self, other: &FieldElement) -> FieldElement {
-                let s = FieldElement::new(self, &other.modulo);
+                let s = FieldElement::new(self, other.modulo.clone());
                 s + other
             }
         }
@@ -282,35 +277,35 @@ macro_rules! sub_impl_field {
        impl Sub<$t> for FieldElement {
        type Output = FieldElement;
             fn sub(self, other: $t) -> FieldElement {
-                let other = FieldElement::new(other, &self.modulo);
+                let other = FieldElement::new(other, self.modulo.clone());
                 self - other
              }
         }
        impl Sub<FieldElement> for $t {
        type Output = FieldElement;
             fn sub(self, other: FieldElement) -> FieldElement {
-                let s = FieldElement::new(self, &other.modulo);
+                let s = FieldElement::new(self, other.modulo.clone());
                 s - other
             }
         }
        impl Sub<FieldElement> for &$t {
        type Output = FieldElement;
             fn sub(self, other: FieldElement) -> FieldElement {
-                let s = FieldElement::new(self.clone(), &other.modulo);
+                let s = FieldElement::new(self.clone(), other.modulo.clone());
                 s - other
             }
         }
        impl Sub<&$t> for FieldElement {
        type Output = FieldElement;
             fn sub(self, other: &$t) -> FieldElement {
-                let other = FieldElement::new(other.clone(), &self.modulo);
+                let other = FieldElement::new(other.clone(), self.modulo.clone());
                 self - other
             }
         }
        impl Sub<&FieldElement> for $t {
        type Output = FieldElement;
             fn sub(self, other: &FieldElement) -> FieldElement {
-                let s = FieldElement::new(self, &other.modulo);
+                let s = FieldElement::new(self, other.modulo.clone());
                 s - other
             }
         }
@@ -322,35 +317,35 @@ macro_rules! div_impl_field {
        impl Div<$t> for FieldElement {
        type Output = FieldElement;
             fn div(self, other: $t) -> FieldElement {
-                let other = FieldElement::new(other, &self.modulo);
+                let other = FieldElement::new(other, self.modulo.clone());
                 self / other
             }
         }
         impl Div<&$t> for FieldElement {
         type Output = FieldElement;
             fn div(self, other: &$t) -> FieldElement {
-                let other = FieldElement::new(other.clone(), &self.modulo);
+                let other = FieldElement::new(other.clone(), self.modulo.clone());
                 self / other
             }
         }
        impl Div<FieldElement> for $t {
        type Output = FieldElement;
             fn div(self, other: FieldElement) -> FieldElement {
-                let s = FieldElement::new(self, &other.modulo);
+                let s = FieldElement::new(self, other.modulo.clone());
                 s / other
             }
         }
        impl Div<&FieldElement> for $t {
        type Output = FieldElement;
             fn div(self, other: &FieldElement) -> FieldElement {
-                let s = FieldElement::new(self, &other.modulo);
+                let s = FieldElement::new(self, other.modulo.clone());
                 s / other
             }
         }
     )*)
 }
 
-mul_impl_field! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 Integer }
-add_impl_field! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 Integer }
-sub_impl_field! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 Integer }
-div_impl_field! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 Integer }
+mul_impl_field! { usize u8 u16 u32 u64 u128 BigInt }
+add_impl_field! { usize u8 u16 u32 u64 u128 BigInt }
+sub_impl_field! { usize u8 u16 u32 u64 u128 BigInt }
+div_impl_field! { usize u8 u16 u32 u64 u128 BigInt }

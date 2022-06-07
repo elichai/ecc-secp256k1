@@ -6,7 +6,7 @@ pub mod internal;
 mod jacobi;
 mod point;
 mod secp256k1;
-//mod u256;
+// mod u256;
 mod ffi;
 #[cfg(test)]
 mod test_vectors;
@@ -19,12 +19,12 @@ pub use crate::ffi::{ecdsa::*, schnorr::*, *};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rug::Integer;
+    use num_bigint::BigInt;
 
     #[test]
     fn it_works() {
-        let s1: Integer = Integer::u_pow_u(2, 32).into();
-        let s2: Integer = Integer::u_pow_u(2, 31).into();
+        let s1: BigInt = BigInt::from(2u32).pow(32);
+        let s2: BigInt = BigInt::from(2u32).pow(31);
         let s = s1 + s2;
 
         let privkey = PrivateKey::new(s);
