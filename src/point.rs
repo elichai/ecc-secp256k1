@@ -2,7 +2,7 @@ use crate::field::*;
 use num_bigint::BigInt;
 use std::{fmt, ops::*};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Group {
     pub a: BigInt,
     pub b: BigInt,
@@ -14,7 +14,7 @@ impl Group {
     }
 
     pub fn get_y(&self, x: &FieldElement) -> FieldElement {
-        let mut y2 = x.clone().pow_u(3u32) + (self.a.clone() * x) + &self.b; // Y^2 = X^3 + ax + b
+        let mut y2 = x.pow_u(3u32) + (self.a.clone() * x) + &self.b; // Y^2 = X^3 + ax + b
         y2.sqrt();
         y2
     }
@@ -88,7 +88,7 @@ impl Point {
 
     #[inline(always)]
     pub fn is_on_curve(&self) -> bool {
-        self.y.clone().pow_u(2u32) == (self.x.clone().pow_u(3u32) + self.group.a.clone() * self.x.clone() + &self.group.b)
+        self.y.pow_u(2u32) == (self.x.pow_u(3u32) + self.group.a.clone() * &self.x + &self.group.b)
         // Y^2 = X^3 + ax + b
     }
 
@@ -99,35 +99,53 @@ impl Point {
 
     #[inline(always)]
     fn get_slope(&self, other: &Point) -> FieldElement {
+        self.same_group(other);
         if self.x != other.x {
-            (self.y.clone() - other.y.clone()) / (self.x.clone() - other.x.clone())
+            (&self.y - &other.y) / (&self.x - &other.x)
         } else {
-            (3u32 * self.x.clone().pow_u(2u32) + &self.group.a) / (2u32 * self.y.clone())
+            (3u32 * self.x.pow_u(2u32) + &self.group.a) / (2u32 * &self.y)
         }
+    }
+
+    #[inline(always)]
+    fn same_group(&self, other: &Self) {
+        if self.group != other.group {
+            unimplemented!();
+        }
+        self.x.same_modulo(&other.x);
+        self.y.same_modulo(&other.y);
     }
 }
 
 impl Add for Point {
     type Output = Self;
     #[inline(always)]
-    fn add(self, other: Self) -> Self {
-        let inf = FieldElement::infinity(self.x.modulo.clone());
+    fn add(mut self, other: Self) -> Self {
+        self += &other;
+        self
+    }
+}
+
+impl AddAssign<&Point> for Point {
+    fn add_assign(&mut self, other: &Self) {
+        self.same_group(other);
         if self.x.is_infinity() {
-            other
+            *self = other.clone();
         } else if other.x.is_infinity() {
-            self
-        } else if self.x == other.x && self.y != other.y {
-            Self { x: inf.clone(), y: inf, group: self.group }
-        } else if self == other && self.y.is_zero() {
-            Self { x: inf.clone(), y: inf, group: self.group }
+            // self stays the same
+        } else if (self.x == other.x && self.y != other.y) || (self == other && self.y.is_zero()) {
+            let inf = FieldElement::infinity(self.x.modulo.clone());
+            self.x = inf.clone();
+            self.y = inf;
         } else {
-            let m = self.get_slope(&other); // Returns the slope of the line
-            let x = m.clone().pow_u(2u32) - &self.x - other.x; // takes the slope to the power of 2 minus both X's
-            let y = m * (self.x - &x) - self.y; // negative of y-y1=m(x-x1) - Simple line equation
-            Self { x, y, group: self.group }
+            let m = self.get_slope(other); // Returns the slope of the line
+            let x = m.pow_u(2u32) - &self.x - &other.x; // takes the slope to the power of 2 minus both X's
+            self.y = m * (&self.x - &x) - &self.y; // negative of y-y1=m(x-x1) - Simple line equation
+            self.x = x;
         }
     }
 }
+
 macro_rules! mul_impl_point {
     ($($t:ty)*) => ($(
        impl Mul<$t> for Point {
@@ -135,11 +153,13 @@ macro_rules! mul_impl_point {
             #[allow(clippy::suspicious_arithmetic_impl)]
             #[inline(always)]
             fn mul(self, mut other: $t) -> Self {
+                use num_traits::identities::Zero;
+                use num_integer::Integer;
                 let mut result = self.gen_zero();
                 let mut adding = self.clone();
-                while other != <$t>::from(0u8) {
-                    if (other.clone() & <$t>::from(1u8)) == <$t>::from(1u8) {
-                        result = result + adding.clone();
+                while !Zero::is_zero(&other) {
+                    if Integer::is_odd(&other) {
+                        result += &adding;
                     }
                     adding = adding.clone() + adding;
                     other >>= 1;
@@ -176,10 +196,12 @@ macro_rules! mul_impl_point {
             #[allow(clippy::suspicious_arithmetic_impl)]
             #[inline(always)]
             fn mul(mut self, other: &Point) -> Point {
+                use num_traits::identities::Zero;
+                use num_integer::Integer;
                 let mut result = other.gen_zero();
                 let mut adding = other.clone();
-                while self != <$t>::from(0u8) {
-                    if (self.clone() & <$t>::from(1u8)) == <$t>::from(1u8) {
+                while !Zero::is_zero(&self) {
+                    if Integer::is_odd(&self) {
                         result = result.clone() + adding.clone();
                     }
                     adding = adding.clone() + adding;
@@ -193,11 +215,13 @@ macro_rules! mul_impl_point {
             #[allow(clippy::suspicious_arithmetic_impl)]
             #[inline(always)]
             fn mul(self, other: &Point) -> Point {
+                use num_traits::identities::Zero;
+                use num_integer::Integer;
                 let mut s = self.clone();
                 let mut result = other.gen_zero();
                 let mut adding = other.clone();
-                while s != <$t>::from(0u8) {
-                    if (s.clone() & <$t>::from(1u8)) == <$t>::from(1u8) {
+                while !Zero::is_zero(&s) {
+                    if Integer::is_odd(&s) {
                         result = result.clone() + adding.clone();
                     }
                     adding = adding.clone() + adding;

@@ -1,5 +1,6 @@
 use num_bigint::{BigInt, Sign};
 use num_integer::Integer;
+use num_traits::Zero;
 use std::{fmt, ops::*};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -22,19 +23,19 @@ impl FieldElement {
     }
 
     pub fn infinity(modulo: BigInt) -> FieldElement {
-        Self { num: 0u32.into(), modulo } // Right now I'm representing Infinity as (0,0).
+        Self { num: BigInt::zero(), modulo } // Right now I'm representing Infinity as (0,0).
     }
 
     pub fn is_infinity(&self) -> bool {
-        self == &Self::infinity(self.modulo.clone())
+        self.is_zero()
     }
     pub fn is_zero(&self) -> bool {
-        self.num == BigInt::from(0u32)
+        self.num.is_zero()
     }
 
-    pub fn pow_u<I: Into<BigInt>>(self, other: I) -> FieldElement {
+    pub fn pow_u<I: Into<BigInt>>(&self, other: I) -> FieldElement {
         let num = self.num.modpow(&other.into(), &self.modulo);
-        FieldElement { num, modulo: self.modulo }
+        FieldElement { num, modulo: self.modulo.clone() }
     }
 
     #[inline(always)]
@@ -46,13 +47,12 @@ impl FieldElement {
 
     #[inline(always)]
     pub fn sqrt(&mut self) {
-        let mut p: BigInt = self.modulo.clone() + 1u32;
-        p /= 4u32;
+        let p: BigInt = (&self.modulo + 1u32) / 4u8;
         self.num = self.num.modpow(&p, &self.modulo);
     }
 
     #[inline(always)]
-    fn same_modulo(&self, other: &Self) {
+    pub(crate) fn same_modulo(&self, other: &Self) {
         if self.modulo != other.modulo {
             unimplemented!();
         }
@@ -147,6 +147,16 @@ impl Sub<&FieldElement> for FieldElement {
     fn sub(self, other: &Self) -> FieldElement {
         self.same_modulo(other);
         let num = self.num - &other.num;
+        mod_and_new(num, &self.modulo)
+    }
+}
+
+impl Sub<&FieldElement> for &FieldElement {
+    type Output = FieldElement;
+    #[inline(always)]
+    fn sub(self, other: &FieldElement) -> FieldElement {
+        self.same_modulo(other);
+        let num = &self.num - &other.num;
         mod_and_new(num, &self.modulo)
     }
 }

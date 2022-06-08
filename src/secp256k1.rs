@@ -209,7 +209,7 @@ impl PrivateKey {
         r.modulo = order.clone();
         r.mod_num().round_mod();
         let mut s: FieldElement = (z + (r.clone() * d)) / k;
-        if s.num > BigInt::from(order / 2u32) {
+        if s.num > order >> 1 {
             s = order - s;
         }
         if r.is_zero() || s.is_zero() {

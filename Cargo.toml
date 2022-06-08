@@ -11,6 +11,7 @@ crate-type = ["staticlib", "rlib"]
 [dependencies]
 num-bigint = "0.4"
 num-integer = "0.1"
+num-traits = "0.2"
 [dev-dependencies]
 secp256k1 = { version = "0.22", features = ["rand-std", "global-context" ] }
 #numext-fixed-uint = "0.1.4"

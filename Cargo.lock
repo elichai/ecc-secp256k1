@@ -203,6 +203,7 @@ dependencies = [
  "criterion",
  "num-bigint",
  "num-integer",
+ "num-traits",
  "rustc-hex",
  "secp256k1",
 ]
